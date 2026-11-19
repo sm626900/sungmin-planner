@@ -800,6 +800,13 @@ body{-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
 @keyframes tfR{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
 .tfL{animation:tfL .3s cubic-bezier(.22,1,.36,1)}
 .tfR{animation:tfR .3s cubic-bezier(.22,1,.36,1)}
+/* 날짜 줄 선택 동그라미: 따로 그려서 미끄러지게 */
+.wstrip{position:relative}
+.wsel{position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;background:var(--text);pointer-events:none;opacity:0;transition:left .36s cubic-bezier(.3,1.25,.4,1),top .36s,background-color .25s,opacity .2s}
+.wsel.td{background:var(--red)}
+.wsel.on{opacity:1}
+.wsd b{position:relative;z-index:1;transition:color .25s}
+.wstrip .wsd.sel b{background:none}
 /* 펼칠 때 내용이 위에서 살짝 내려오며 나타나기 */
 @keyframes openIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .fold .fb,.exc .exitems{animation:openIn .28s cubic-bezier(.22,1,.36,1)}
@@ -1188,7 +1195,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "a7c95e05f879";
+const BUILD = "de417f26c9ce";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1691,6 +1698,7 @@ function patchNode(x, y){
   if (x.nodeType !== y.nodeType || x.nodeName !== y.nodeName){ x.replaceWith(y); return; }
   if (x.nodeType === 3 || x.nodeType === 8){ if (x.nodeValue !== y.nodeValue) x.nodeValue = y.nodeValue; return; }
   if (x.nodeType !== 1) return;
+  if (x.hasAttribute('data-live')) return;   /* JS가 직접 움직이는 요소는 건드리지 않는다 */
   for (const at of Array.from(x.attributes)) if (!y.hasAttribute(at.name)) x.removeAttribute(at.name);
   for (const at of Array.from(y.attributes)) if (x.getAttribute(at.name) !== at.value) x.setAttribute(at.name, at.value);
   if (x.tagName !== 'TEXTAREA') patchKids(x, y);
@@ -1715,6 +1723,7 @@ function render(){
   if (lastTab !== tab){ v.innerHTML = html; v.classList.remove('fade'); void v.offsetWidth; v.classList.add('fade'); clearTimeout(render.ft); render.ft = setTimeout(() => v.classList.remove('fade'), 450); lastTab = tab; }
   else morph(v, html);
   renderSheet();
+  posSel();
 }
 const navBar = (right='') => `<div class="nav"><span class="navl"><span class="sync ${/동기화됨|연결됨|저장 중|불러오는/.test(syncTxt) ? '' : 'warn'}" id="synctxt">${esc(syncTxt)}</span></span>${right}</div>`;
 const UNDOI = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
@@ -2644,7 +2653,7 @@ document.addEventListener('click', e => {
   if (!['hwdel','wdel','dailydel','fxdel','subjdel','dddel','tploff'].includes(a)) delArm = null;
   switch (a){
     case 'tab': tab = t.dataset.tab; render(); return;
-    case 'day': { const n = +t.dataset.n; cur = addDays(cur, n); weekStart = weekStartOf(cur); ensureDays(); render(); slideIn(n, Math.abs(n) >= 7); return; }
+    case 'day': goDay(+t.dataset.n); return;
     case 'open': { const was = tab === 'today' ? cur : null; cur = d; weekStart = weekStartOf(cur); tab = 'today'; sheet = null; ensureDays(); render(); if (was && was !== d) slideIn(d > was ? 1 : -1, weekStart !== weekStartOf(was)); else window.scrollTo(0,0); return; }
     case 'gotoday': { const was = cur; cur = today(); weekStart = weekStartOf(cur); ensureDays(); render(); if (was !== cur) slideIn(cur > was ? 1 : -1, weekStartOf(was) !== weekStart); return; }
     case 'wk': { const n = +t.dataset.n; weekStart = addDays(weekStart, n); ensureDays(); render(); slideIn(n); return; }
@@ -3398,6 +3407,38 @@ function ddaySheetHTML(){
   return b;
 }
 /* ===== 애플 캘린더처럼: 날짜 줄 + 하루 보기 ===== */
+/* 하루씩·주씩 옮기기 (버튼, 옆으로 쓸기 공용) */
+function goDay(n){ const ows = weekStart; cur = addDays(cur, n); weekStart = weekStartOf(cur); ensureDays(); render(); slideIn(n, weekStart !== ows); }
+/* 날짜 줄의 선택 동그라미: 다른 날을 고르면 그 자리로 미끄러져 간다 */
+function posSel(){
+  const s = document.querySelector('#view .wstrip'), i = s && s.querySelector('.wsel'); if (!i) return;
+  const b = s.querySelector('.wsd.sel b');
+  if (!b){ i.classList.remove('on'); return; }
+  const rs = s.getBoundingClientRect(), rb = b.getBoundingClientRect(), wk = s.querySelector('.wsd') && s.querySelector('.wsd').dataset.d;
+  const jump = !i.classList.contains('on') || posSel.wk !== wk; posSel.wk = wk;
+  if (jump) i.style.transition = 'none';
+  i.style.left = (rb.left - rs.left) + 'px'; i.style.top = (rb.top - rs.top) + 'px';
+  i.classList.toggle('td', b.parentElement.classList.contains('td')); i.classList.add('on');
+  if (jump){ void i.offsetWidth; i.style.transition = ''; }
+}
+addEventListener('resize', () => { posSel.wk = null; posSel(); });
+/* 오늘 화면에서 옆으로 쓸면 다른 날로 (날짜 줄 위에서는 주 단위) */
+(function(){
+  let s = null;
+  document.addEventListener('touchstart', e => {
+    s = null;
+    if (tab !== 'today' || sheet || e.touches.length !== 1) return;
+    const tg = e.target; if (!tg.closest('#view') || tg.closest('input,select,textarea,.scroll')) return;
+    s = { x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now(), strip:!!tg.closest('.wstrip') };
+  }, { passive:true });
+  document.addEventListener('touchend', e => {
+    if (!s || dragging) { s = null; return; }
+    const p = e.changedTouches[0], dx = p.clientX - s.x, dy = p.clientY - s.y, st = s; s = null;
+    if (Date.now() - st.t > 700 || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+    const n = dx < 0 ? 1 : -1;
+    goDay(st.strip ? n * 7 : n);
+  });
+})();
 /* 화면 전체를 살짝 페이드 (단계가 바뀔 때) */
 function fadeView(){ const v = $('#view'); v.classList.remove('fade'); void v.offsetWidth; v.classList.add('fade'); clearTimeout(render.ft); render.ft = setTimeout(() => v.classList.remove('fade'), 450); }
 /* 시트 안에서 고른 날짜가 바뀌면 날짜 줄 아래를 옆으로 밀기 */
@@ -3420,7 +3461,7 @@ function slideIn(n, strip = true){
   const v = $('#view'), kids = [...v.children];
   const i = kids.findIndex(k => k.classList.contains('wstrip') || k.classList.contains('lsub') && (tab === 'week' || tab === 'hw'));
   if (i < 0) return;
-  const head = kids[i], els = kids.slice(i + 1).concat(strip ? [...head.querySelectorAll('.wsd, .dt')] : []);
+  const head = kids[i], els = kids.slice(i + 1).concat(strip ? [...head.querySelectorAll('.wsd, .dt, .wsel')] : []);
   const cls = n > 0 ? 'slL' : 'slR';
   /* 오늘 화면 제목(오늘 → 목요일 등)과 날짜 줄은 조금만 움직이며 바뀐다 */
   const tcls = n > 0 ? 'tfL' : 'tfR', tels = tab === 'today' ? [$('#view .lt'), $('#view .lsub')].filter(Boolean) : [];
@@ -3431,7 +3472,7 @@ function slideIn(n, strip = true){
 }
 function weekStrip(){
   const ws = weekStartOf(cur), td = today();
-  return `<div class="wstrip"><button class="chev" data-act="day" data-n="-7">${IC.chevL}</button>${[0,1,2,3,4,5,6].map(i => { const d = addDays(ws, i); return `<button class="wsd ${d === cur ? 'sel' : ''} ${d === td ? 'td' : ''} ${inDday(d) ? 'ex' : ''}" data-act="open" data-d="${d}"><small>${DAYS[dowOf(d)]}</small><b>${parseYmd(d).getDate()}</b></button>`; }).join('')}<button class="chev" data-act="day" data-n="7">${IC.chevR}</button></div>`;
+  return `<div class="wstrip"><span class="wsel" data-live></span><button class="chev" data-act="day" data-n="-7">${IC.chevL}</button>${[0,1,2,3,4,5,6].map(i => { const d = addDays(ws, i); return `<button class="wsd ${d === cur ? 'sel' : ''} ${d === td ? 'td' : ''} ${inDday(d) ? 'ex' : ''}" data-act="open" data-d="${d}"><small>${DAYS[dowOf(d)]}</small><b>${parseYmd(d).getDate()}</b></button>`; }).join('')}<button class="chev" data-act="day" data-n="7">${IC.chevR}</button></div>`;
 }
 function dayCalHTML(R, date, isToday){
   const blocks = simplifyBlocks(R.blocks, { rests:true });
