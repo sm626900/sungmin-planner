@@ -790,6 +790,25 @@ body{-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
 #login .lg-t{font-size:28px;font-weight:700;letter-spacing:.2px}
 #login .lg-s{color:var(--sub);font-size:15px;margin:8px 0 28px;line-height:1.45}
 #login .lg-btn{width:100%;border:0;border-radius:14px;background:var(--text);color:var(--bg);font-size:17px;font-weight:600;padding:15px}
+/* 주 넘길 때 옆으로 밀기 */
+@keyframes slL{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+@keyframes slR{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
+.slL{animation:slL .34s cubic-bezier(.22,1,.36,1)}
+.slR{animation:slR .34s cubic-bezier(.22,1,.36,1)}
+.slL .cc.on,.slR .cc.on,.slL .bchk.on,.slR .bchk.on{animation:none}
+/* 폰: 체크는 크게, 누르는 영역은 더 넓게, 옆 버튼과 떨어뜨리기 */
+@media (pointer:coarse){
+  .rw{min-height:54px}
+  .cc{width:30px;height:30px}
+  .cc svg{width:16px;height:16px}
+  .cc,.bchk,.xbtn{position:relative}
+  .cc::after{content:"";position:absolute;inset:-12px -10px -12px -14px}
+  .bchk::after{content:"";position:absolute;inset:-10px}
+  .ti .bchk{width:30px;height:30px}
+  .xbtn{min-width:40px;min-height:40px;padding:8px;margin-right:-8px;display:grid;place-items:center}
+  .rw .tmb{padding:7px 11px;margin-left:4px}
+  .rw .tmb + .xbtn{margin-left:2px}
+}
 </style>
 </head>
 <body>
@@ -2588,11 +2607,11 @@ document.addEventListener('click', e => {
   if (!['hwdel','wdel','dailydel','fxdel','subjdel','dddel','tploff'].includes(a)) delArm = null;
   switch (a){
     case 'tab': tab = t.dataset.tab; render(); return;
-    case 'day': cur = addDays(cur, +t.dataset.n); weekStart = weekStartOf(cur); ensureDays(); render(); return;
+    case 'day': { const n = +t.dataset.n; cur = addDays(cur, n); weekStart = weekStartOf(cur); ensureDays(); render(); if (Math.abs(n) >= 7) slideIn(n); return; }
     case 'open': cur = d; weekStart = weekStartOf(cur); tab = 'today'; sheet = null; ensureDays(); render(); window.scrollTo(0,0); return;
     case 'gotoday': cur = today(); weekStart = weekStartOf(cur); ensureDays(); render(); return;
-    case 'wk': weekStart = addDays(weekStart, +t.dataset.n); ensureDays(); render(); return;
-    case 'thisweek': weekStart = weekStartOf(today()); ensureDays(); render(); return;
+    case 'wk': { const n = +t.dataset.n; weekStart = addDays(weekStart, n); ensureDays(); render(); slideIn(n); return; }
+    case 'thisweek': { const n = weekStartOf(today()) < weekStart ? -1 : 1; weekStart = weekStartOf(today()); ensureDays(); render(); slideIn(n); return; }
     case 'openday': ensureDays(); openSheet({ type:'day', date:d }); return;
     case 'openweekly': openSheet({ type:'weekly', prev: sheet && sheet.type !== 'weekly' ? sheet : null }); return;
     case 'opentimes': openSheet({ type:'times' }); return;
@@ -3342,6 +3361,16 @@ function ddaySheetHTML(){
   return b;
 }
 /* ===== 애플 캘린더처럼: 날짜 줄 + 하루 보기 ===== */
+/* 주가 바뀔 때 날짜 아래 내용을 옆으로 밀며 바꾼다 (n>0: 다음 주) */
+function slideIn(n){
+  const v = $('#view'), kids = [...v.children];
+  const i = kids.findIndex(k => k.classList.contains('wstrip') || k.classList.contains('lsub') && tab === 'week');
+  if (i < 0) return;
+  const head = kids[i], els = kids.slice(i + 1).concat([...head.querySelectorAll('.wsd, .dt')]);
+  const cls = n > 0 ? 'slL' : 'slR';
+  for (const el of els){ el.classList.remove('slL', 'slR'); void el.offsetWidth; el.classList.add(cls); }
+  clearTimeout(slideIn.t); slideIn.t = setTimeout(() => els.forEach(el => el.classList.remove(cls)), 420);
+}
 function weekStrip(){
   const ws = weekStartOf(cur), td = today();
   return `<div class="wstrip"><button class="chev" data-act="day" data-n="-7">${IC.chevL}</button>${[0,1,2,3,4,5,6].map(i => { const d = addDays(ws, i); return `<button class="wsd ${d === cur ? 'sel' : ''} ${d === td ? 'td' : ''} ${inDday(d) ? 'ex' : ''}" data-act="open" data-d="${d}"><small>${DAYS[dowOf(d)]}</small><b>${parseYmd(d).getDate()}</b></button>`; }).join('')}<button class="chev" data-act="day" data-n="7">${IC.chevR}</button></div>`;
