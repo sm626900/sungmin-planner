@@ -137,8 +137,9 @@ button.rw:active,.rw.tap:active{background:var(--fill)}
 .mring svg{width:30px;height:30px;transform:rotate(-90deg)}
 
 /* 시트 */
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40;opacity:0;pointer-events:none;transition:opacity .25s}
-.scrim.on{opacity:1;pointer-events:auto}
+/* 닫혔을 때는 색도 없애고 숨긴다. iOS가 위에 고정된 요소 색으로 상태 표시줄을 칠해서, 투명하게만 두면 회색 띠가 남는다 */
+.scrim{position:fixed;inset:0;background:transparent;z-index:40;pointer-events:none;visibility:hidden;transition:background-color .25s,visibility 0s linear .25s}
+.scrim.on{background:rgba(0,0,0,.35);pointer-events:auto;visibility:visible;transition:background-color .25s,visibility 0s}
 .sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:640px;max-height:92vh;background:var(--bg);border-radius:14px 14px 0 0;z-index:41;transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
 .sheet.on{transform:none}
 .sheet .grab{width:36px;height:5px;border-radius:3px;background:var(--fill2);margin:6px auto 0}
@@ -1187,7 +1188,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "56f1974768a1";
+const BUILD = "a7c95e05f879";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
