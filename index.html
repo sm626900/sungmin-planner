@@ -1200,7 +1200,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "81dbff13cb62";
+const BUILD = "88020baafb01";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1723,6 +1723,8 @@ function patchNode(x, y){
 let lastTab = null;
 function render(){
   if (dragging) return;
+  /* 옆으로 넘기는 중에는 다시 그리기를 모아 두었다가 끝나면 한 번에 (데이터가 도착할 때마다 그리면 움직임이 끊긴다) */
+  if (render.hold > Date.now()){ clearTimeout(render.ht); render.ht = setTimeout(render, render.hold - Date.now() + 10); return; }
   const ae = document.activeElement;
   if (ae && ae.dataset && ae.dataset.keep && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
   if (tab === 'set') tab = 'today';
@@ -2652,6 +2654,7 @@ function addTodo(v, cat){ setDay(cur, D => { D.todos = D.todos || []; D.todos.pu
 function addDaily(v){ S.daily.push({ id:uid(), text:v, days:[0,1,2,3,4,5,6] }); saveS(); }
 
 document.addEventListener('click', e => {
+  render.hold = 0;   /* 사용자가 누른 건 바로 그린다 */
   if (e.target === $('#scrim')){ sheet = null; delArm = null; render(); return; }
   const tb = e.target.closest('#tabbar button');
   if (tb){ tab = tb.dataset.tab; delArm = null; sheet = null; render(); window.scrollTo({ top:0, behavior:'smooth' }); return; }
@@ -3421,22 +3424,25 @@ function goDay(n){ const nws = weekStartOf(addDays(cur, n)), wkChg = nws !== wee
 /* 주가 바뀌면: 지금 내용을 먼저 살짝 내보내고(0.14초) 새 주를 들여온다. 같은 주면 바로 들여온다 */
 function swapWeek(n, wkChg, apply){
   if (swapWeek.t){ clearTimeout(swapWeek.t); swapWeek.t = 0; swapWeek.fn && swapWeek.fn(); }
-  const run = () => { swapWeek.t = 0; swapWeek.fn = null; apply(); slideIn(n, wkChg); };
+  const run = () => { swapWeek.t = 0; swapWeek.fn = null; render.hold = 0; apply(); slideIn(n, wkChg); };
   if (!wkChg || matchMedia('(prefers-reduced-motion: reduce)').matches){ run(); return; }
   const els = slideTargets(true); if (!els.length){ run(); return; }
   const c = n > 0 ? 'slOutL' : 'slOutR';
   for (const el of els){ el.classList.remove('slL', 'slR', 'slOutL', 'slOutR'); void el.offsetWidth; el.classList.add(c); }
-  swapWeek.fn = run; swapWeek.t = setTimeout(run, 140);
+  swapWeek.fn = run; swapWeek.t = setTimeout(run, 110);
 }
 /* 날짜 줄의 선택 동그라미: 다른 날을 고르면 그 자리로 미끄러져 간다 */
 function posSel(){
   const s = document.querySelector('#view .wstrip'), i = s && s.querySelector('.wsel'); if (!i) return;
   const b = s.querySelector('.wsd.sel b');
   if (!b){ i.classList.remove('on'); return; }
-  const rs = s.getBoundingClientRect(), rb = b.getBoundingClientRect(), wk = s.querySelector('.wsd') && s.querySelector('.wsd').dataset.d;
+  /* offsetLeft/Top은 옆으로 미는 움직임(transform)과 상관없는 원래 자리라서, 주를 넘기는 도중에 재도 정확하다 */
+  const wk = s.querySelector('.wsd') && s.querySelector('.wsd').dataset.d;
   const jump = !i.classList.contains('on') || posSel.wk !== wk; posSel.wk = wk;
   if (jump) i.style.transition = 'none';
-  i.style.left = (rb.left - rs.left) + 'px'; i.style.top = (rb.top - rs.top) + 'px';
+  /* 움직이는 중이면 기준 요소가 날짜 칸으로 바뀌므로 날짜 줄까지 거슬러 올라가며 더한다 */
+  let x = 0, y = 0; for (let e = b; e && e !== s; e = e.offsetParent){ x += e.offsetLeft; y += e.offsetTop; }
+  i.style.left = x + 'px'; i.style.top = y + 'px';
   i.classList.toggle('td', b.parentElement.classList.contains('td')); i.classList.add('on');
   if (jump){ void i.offsetWidth; i.style.transition = ''; }
 }
@@ -3485,6 +3491,7 @@ function slideTargets(strip){
 }
 function slideIn(n, strip = true){
   const els = slideTargets(strip); if (!els.length) return;
+  render.hold = Date.now() + 380;
   els.forEach(el => el.classList.remove('slOutL', 'slOutR'));
   const cls = n > 0 ? 'slL' : 'slR';
   /* 오늘 화면 제목(오늘 → 목요일 등)과 날짜 줄은 조금만 움직이며 바뀐다 */
