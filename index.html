@@ -795,6 +795,10 @@ body{-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
 @keyframes slR{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
 .slL{animation:slL .34s cubic-bezier(.22,1,.36,1)}
 .slR{animation:slR .34s cubic-bezier(.22,1,.36,1)}
+@keyframes tfL{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+@keyframes tfR{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+.tfL{animation:tfL .3s cubic-bezier(.22,1,.36,1)}
+.tfR{animation:tfR .3s cubic-bezier(.22,1,.36,1)}
 .slL .cc.on,.slR .cc.on,.slL .bchk.on,.slR .bchk.on{animation:none}
 /* 폰: 체크는 크게, 누르는 영역은 더 넓게, 옆 버튼과 떨어뜨리기 */
 @media (pointer:coarse){
@@ -808,6 +812,13 @@ body{-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
   .xbtn{min-width:40px;min-height:40px;padding:8px;margin-right:-8px;display:grid;place-items:center}
   .rw .tmb{padding:7px 11px;margin-left:4px}
   .rw .tmb + .xbtn{margin-left:2px}
+  /* 하루 시간표 안 할 일 체크 */
+  .dev .tk .o,.tk .o{width:21px;height:21px;position:relative;border-width:1.8px}
+  .dev .tk .o svg,.tk .o svg{width:12px;height:12px}
+  .dev .tk.slot .o{margin-top:-2px}
+  .tk .o::after{content:"";position:absolute;inset:-9px -12px -12px -10px}
+  .dev .bchk{width:24px;height:24px}
+  .dev .bchk svg{width:12px;height:12px}
 }
 </style>
 </head>
@@ -1171,6 +1182,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
+const BUILD = "5928a9bf8983";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1283,6 +1295,25 @@ async function saveFile(filename, blob){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
+
+/* ===== 새 버전 확인 =====
+   홈 화면 앱은 예전 파일을 오래 들고 있으니, 열 때·다시 볼 때 새 버전이 있으면 한 번 새로 고친다. */
+async function checkUpdate(){
+  if (typeof BUILD === 'undefined' || !/^https?:$/.test(location.protocol)) return;
+  try {
+    const html = await (await fetch(location.pathname + '?v=' + Date.now(), { cache:'no-store' })).text();
+    const m = html.match(/const BUILD = "(\w+)"/);
+    if (!m || m[1] === BUILD) return;
+    const last = +sessionStorage.getItem('pl_reload') || 0;
+    if (Date.now() - last < 60000) return;
+    const ae = document.activeElement;
+    if (sheet || (ae && /INPUT|TEXTAREA/.test(ae.tagName))) return;
+    sessionStorage.setItem('pl_reload', Date.now());
+    location.reload();
+  } catch(e){}
+}
+setTimeout(checkUpdate, 4000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
 /* ===== 상태 ===== */
 const today = () => ymd(new Date());
 let S = defaultSettings();
@@ -2607,9 +2638,9 @@ document.addEventListener('click', e => {
   if (!['hwdel','wdel','dailydel','fxdel','subjdel','dddel','tploff'].includes(a)) delArm = null;
   switch (a){
     case 'tab': tab = t.dataset.tab; render(); return;
-    case 'day': { const n = +t.dataset.n; cur = addDays(cur, n); weekStart = weekStartOf(cur); ensureDays(); render(); if (Math.abs(n) >= 7) slideIn(n); return; }
-    case 'open': cur = d; weekStart = weekStartOf(cur); tab = 'today'; sheet = null; ensureDays(); render(); window.scrollTo(0,0); return;
-    case 'gotoday': cur = today(); weekStart = weekStartOf(cur); ensureDays(); render(); return;
+    case 'day': { const n = +t.dataset.n; cur = addDays(cur, n); weekStart = weekStartOf(cur); ensureDays(); render(); slideIn(n, Math.abs(n) >= 7); return; }
+    case 'open': { const was = tab === 'today' ? cur : null; cur = d; weekStart = weekStartOf(cur); tab = 'today'; sheet = null; ensureDays(); render(); if (was && was !== d) slideIn(d > was ? 1 : -1, weekStart !== weekStartOf(was)); else window.scrollTo(0,0); return; }
+    case 'gotoday': { const was = cur; cur = today(); weekStart = weekStartOf(cur); ensureDays(); render(); if (was !== cur) slideIn(cur > was ? 1 : -1, weekStartOf(was) !== weekStart); return; }
     case 'wk': { const n = +t.dataset.n; weekStart = addDays(weekStart, n); ensureDays(); render(); slideIn(n); return; }
     case 'thisweek': { const n = weekStartOf(today()) < weekStart ? -1 : 1; weekStart = weekStartOf(today()); ensureDays(); render(); slideIn(n); return; }
     case 'openday': ensureDays(); openSheet({ type:'day', date:d }); return;
@@ -3362,12 +3393,16 @@ function ddaySheetHTML(){
 }
 /* ===== 애플 캘린더처럼: 날짜 줄 + 하루 보기 ===== */
 /* 주가 바뀔 때 날짜 아래 내용을 옆으로 밀며 바꾼다 (n>0: 다음 주) */
-function slideIn(n){
+function slideIn(n, strip = true){
   const v = $('#view'), kids = [...v.children];
   const i = kids.findIndex(k => k.classList.contains('wstrip') || k.classList.contains('lsub') && tab === 'week');
   if (i < 0) return;
-  const head = kids[i], els = kids.slice(i + 1).concat([...head.querySelectorAll('.wsd, .dt')]);
+  const head = kids[i], els = kids.slice(i + 1).concat(strip ? [...head.querySelectorAll('.wsd, .dt')] : []);
   const cls = n > 0 ? 'slL' : 'slR';
+  /* 오늘 화면 제목(오늘 → 목요일 등)과 날짜 줄은 조금만 움직이며 바뀐다 */
+  const tcls = n > 0 ? 'tfL' : 'tfR', tels = tab === 'today' ? [$('#view .lt'), $('#view .lsub')].filter(Boolean) : [];
+  for (const el of tels){ el.classList.remove('tfL', 'tfR'); void el.offsetWidth; el.classList.add(tcls); }
+  clearTimeout(slideIn.tt); slideIn.tt = setTimeout(() => tels.forEach(el => el.classList.remove(tcls)), 420);
   for (const el of els){ el.classList.remove('slL', 'slR'); void el.offsetWidth; el.classList.add(cls); }
   clearTimeout(slideIn.t); slideIn.t = setTimeout(() => els.forEach(el => el.classList.remove(cls)), 420);
 }
