@@ -799,6 +799,11 @@ body{-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
 @keyframes tfR{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
 .tfL{animation:tfL .3s cubic-bezier(.22,1,.36,1)}
 .tfR{animation:tfR .3s cubic-bezier(.22,1,.36,1)}
+/* 펼칠 때 내용이 위에서 살짝 내려오며 나타나기 */
+@keyframes openIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.fold .fb,.exc .exitems{animation:openIn .28s cubic-bezier(.22,1,.36,1)}
+#view.fade .fold .fb,#view.fade .exc .exitems{animation:none}
+.sbody.slL,.sbody.slR{overflow-x:hidden}
 .slL .cc.on,.slR .cc.on,.slL .bchk.on,.slR .bchk.on{animation:none}
 /* 폰: 체크는 크게, 누르는 영역은 더 넓게, 옆 버튼과 떨어뜨리기 */
 @media (pointer:coarse){
@@ -1182,7 +1187,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "5928a9bf8983";
+const BUILD = "56f1974768a1";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -2174,7 +2179,7 @@ function renderSheet(){
   const key = sheet.type + (sheet.key || '') + (sheet.date || '') + (sheet.fid || '') + (sheet.isNew ? 'n' : '') + (sheet.s != null ? 's' + sheet.s : '');
   morph($('#shd'), `<button></button><b>${esc(title)}</b><button class="r" data-act="sheetclose">${right}</button>`);
   const sb = $('#sbody');
-  if (sb.dataset.key !== key){ sb.innerHTML = body; sb.scrollTop = 0; sb.dataset.key = key; } else morph(sb, body);
+  if (sb.dataset.key !== key){ const swap = el.classList.contains('on') && sb.dataset.key; sb.innerHTML = body; sb.scrollTop = 0; sb.dataset.key = key; if (swap){ const c = renderSheet.back ? 'slR' : 'slL'; sb.classList.remove('slL', 'slR'); void sb.offsetWidth; sb.classList.add(c); setTimeout(() => sb.classList.remove(c), 420); } } else morph(sb, body); renderSheet.back = false;
   el.classList.add('on'); scr.classList.add('on');
 }
 
@@ -2647,7 +2652,7 @@ document.addEventListener('click', e => {
     case 'openweekly': openSheet({ type:'weekly', prev: sheet && sheet.type !== 'weekly' ? sheet : null }); return;
     case 'opentimes': openSheet({ type:'times' }); return;
     case 'sheetclose': sheet = null; render(); return;
-    case 'sheetback': if (sheet && sheet.prev){ sheet = sheet.prev; render(); } return;
+    case 'sheetback': if (sheet && sheet.prev){ sheet = sheet.prev; renderSheet.back = true; render(); } return;
     case 'undo': undoChange(d, t.dataset.k); toast('되돌렸습니다'); return;
     case 'yaja': {
       const dow = dowOf(d);
@@ -2708,7 +2713,7 @@ document.addEventListener('click', e => {
     case 'mydel': myListEdit(L => { const i = L.findIndex(y => y.id === t.dataset.id); if (i >= 0) L.splice(i, 1); }); return;
     case 'mysavedef': S.myRoutine = clone(weekMy(t.dataset.ws)); saveS(); toast('매주 기본으로 저장했습니다'); return;
     case 'myreset': { const ws = t.dataset.ws; WEEKDOC[ws] = Object.assign({}, WEEKDOC[ws] || {}); delete WEEKDOC[ws].my; save('weeks/' + ws, WEEKDOC[ws]); render(); toast('기본 목록으로 되돌렸습니다'); return; }
-    case 'whenday': sheet.selD = v; ensureWeek(weekStartOf(v)); render(); return;
+    case 'whenday': { const n = v > sheet.selD ? 1 : -1; if (v === sheet.selD) return; sheet.selD = v; ensureWeek(weekStartOf(v)); render(); slideSheetAfter('.dp.on', n); return; }
     case 'whendur': sheet.dur = v === 'full' ? 'full' : +v; render(); return;
     case 'whendurn': sheet.dur = Math.max(10, Math.min(600, (+sheet.dur || 30) + +t.dataset.n)); render(); return;
     case 'setwhen2': { const st = sheet, to = st.selD || st.date;
@@ -2772,14 +2777,14 @@ document.addEventListener('click', e => {
       else if (tk.startsWith('d:')) setDay(dd, D => { D.skipPart = D.skipPart || {}; D.skipPart[tk] = true; });
       else if (tk.startsWith('h:')){ const [, hid, pi] = tk.split(':'); const h0 = HW.items.find(x => x.id === hid); if (h0){ h0.parts = h0.parts.filter(x => x.i !== +pi); if (!h0.parts.length) HW.items = HW.items.filter(x => x !== h0); saveHW(); } }
       sheet = null; render(); toast('지웠습니다'); return; }
-    case 'hwmode': hwMode = v; render(); return;
+    case 'hwmode': { const n = v === 'split' ? 1 : -1; if (hwMode === v) return; hwMode = v; render(); const sg = document.querySelector('#view .segc'); if (sg){ const kids = [...$('#view').children], i = kids.indexOf(sg.closest('#view > *')); kids.slice(i + 1).forEach(el => { el.classList.remove('slL', 'slR'); void el.offsetWidth; el.classList.add(n > 0 ? 'slL' : 'slR'); setTimeout(() => el.classList.remove('slL', 'slR'), 420); }); } return; }
     case 'backup': exportAll(); return;
     case 'importpick': pickBackup(); return;
     case 'importgo': applyBackup(); return;
     case 'importno': IMPORT = null; render(); return;
     case 'logout': if (FB) FB.signOut(); return;
-    case 'fold': { const f = t.dataset.f; FOLD[f] = !FOLD[f]; try { localStorage.setItem('pl_fold', JSON.stringify(FOLD)); } catch(e){} render(); return; }
-    case 'hwwk': hwWeek = addDays(hwWeek || weekStartOf(today()), +t.dataset.n); ensureWeek(hwWeek); { for (let i = 0; i < 7; i++){ const p2 = 'days/' + addDays(hwWeek, i); if (!subs[p2]) sub(p2, data => { if (running[p2] || pend[p2]) return; DAYDOC[p2.slice(5)] = data ? clone(data) : {}; render(); }); } } render(); return;
+    case 'fold': { const f = t.dataset.f, fb = FOLD[f] ? t.closest('.fold') && t.closest('.fold').querySelector('.fb') : null; FOLD[f] = !FOLD[f]; try { localStorage.setItem('pl_fold', JSON.stringify(FOLD)); } catch(e){} collapseThen(fb, render); return; }
+    case 'hwwk': { const n = +t.dataset.n; hwWeek = addDays(hwWeek || weekStartOf(today()), n); ensureWeek(hwWeek); { for (let i = 0; i < 7; i++){ const p2 = 'days/' + addDays(hwWeek, i); if (!subs[p2]) sub(p2, data => { if (running[p2] || pend[p2]) return; DAYDOC[p2.slice(5)] = data ? clone(data) : {}; render(); }); } } render(); slideIn(n); return; }
     case 'openfit': ensureDays(); openSheet({ type:'fit', date:d }); return;
     case 'fitmeal': { const [n, a, z] = v.split('|'); setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:n, start:a, end:z, kind:'meal', place:'here' }); }); toast(n + ' 넣었습니다'); return; }
     case 'fitmin': { const tk = t.dataset.tk, P = planFor(d, simplifyBlocks(buildDay(S, d, getDay(d)).blocks)), x = P.tasks.find(y => y.tk === tk); if (!x) return;
@@ -2805,15 +2810,15 @@ document.addEventListener('click', e => {
       render(); toast(n ? n + '개를 내일로 넘겼습니다' : '넘길 할 일이 없습니다'); return; }
     case 'closeday': setDay(d, D => { D.closed = true; }); toast('마감했습니다 🌙'); return;
     case 'gowkplan': tab = 'week'; weekStart = weekStartOf(cur); ensureDays(); ensureWeek(weekStart); wkPlan = { ws:weekStart, step:(WEEKDOC[weekStart] || {}).planned ? 0 : 1, over:{}, off:new Set() }; render(); window.scrollTo(0,0); return;
-    case 'wkplan': ensureWeek(weekStart); wkPlan = { ws:weekStart, step:(WEEKDOC[weekStart] || {}).planned ? 0 : 1, over:{}, off:new Set() }; render(); window.scrollTo(0,0); return;
-    case 'wkedit': wkPlan = { ws:wkPlan ? wkPlan.ws : weekStart, step:1, over:{}, off:new Set() }; render(); window.scrollTo(0,0); return;
-    case 'wkcancel': wkPlan = null; render(); return;
-    case 'wk1next': wkPlan.step = 2; render(); window.scrollTo(0,0); return;
-    case 'wk2back': wkPlan.step = 1; render(); return;
+    case 'wkplan': ensureWeek(weekStart); wkPlan = { ws:weekStart, step:(WEEKDOC[weekStart] || {}).planned ? 0 : 1, over:{}, off:new Set() }; render(); fadeView(); window.scrollTo(0,0); return;
+    case 'wkedit': wkPlan = { ws:wkPlan ? wkPlan.ws : weekStart, step:1, over:{}, off:new Set() }; render(); fadeView(); window.scrollTo(0,0); return;
+    case 'wkcancel': wkPlan = null; render(); fadeView(); return;
+    case 'wk1next': wkPlan.step = 2; render(); fadeView(); window.scrollTo(0,0); return;
+    case 'wk2back': wkPlan.step = 1; render(); fadeView(); return;
     case 'wkacc': { const id = t.dataset.id; if (wkPlan.off.has(id)) wkPlan.off.delete(id); else wkPlan.off.add(id); render(); return; }
     case 'wkchg': openSheet({ type:'wkwhen', id:t.dataset.id }); return;
     case 'wkpick': { wkPlan.over[sheet.id] = v === 'none' ? 'none' : { date:sheet.selD, key:v }; wkPlan.off.delete(sheet.id); sheet = null; render(); return; }
-    case 'wkwday': sheet.selD = v; ensureWeek(weekStartOf(v)); render(); return;
+    case 'wkwday': { const n = v > sheet.selD ? 1 : -1; if (v === sheet.selD) return; sheet.selD = v; ensureWeek(weekStartOf(v)); render(); slideSheetAfter('.dp.on', n); return; }
     case 'wkdone': wkConfirm(); return;
     case 'wkmin': { const k = t.dataset.k, n = +t.dataset.n;
       if (k.startsWith('dl:')){ const x = S.daily.find(y => y.id === k.slice(3)); x.min = Math.max(10, (+x.min || (/단어/.test(x.text) ? 20 : 30)) + n); saveS(); }
@@ -2834,10 +2839,10 @@ document.addEventListener('click', e => {
       setDay(cur, D => { D.todos = D.todos || []; D.todos.push({ id:x.id, text:x.text, done:false, cat:x.cat, min:x.min, due:x.due }); });
       WEEKDOC[ws] = Object.assign({}, W, { tasks:(W.tasks || []).filter(y => y.id !== x.id) }); save('weeks/' + ws, WEEKDOC[ws]); render(); toast('오늘 할 일에 넣었습니다. 시간은 오른쪽 버튼으로 정하세요'); return; }
     case 'blkchk': setDay(d, D => { D.done = D.done || {}; if (D.done[t.dataset.k] === 1) delete D.done[t.dataset.k]; else D.done[t.dataset.k] = 1; }); return;
-    case 'replan': planStep = 1; render(); window.scrollTo({ top:0, behavior:'smooth' }); return;
-    case 'p1next': planStep = 2; plan2Off = new Set(); render(); window.scrollTo({ top:0 }); return;
+    case 'replan': planStep = 1; render(); fadeView(); window.scrollTo({ top:0, behavior:'smooth' }); return;
+    case 'p1next': planStep = 2; plan2Off = new Set(); render(); fadeView(); window.scrollTo({ top:0 }); return;
     case 'p1skip': case 'p2skip': setDay(cur, D => { D.planned = true; }); planStep = null; render(); return;
-    case 'p2back': planStep = 1; render(); return;
+    case 'p2back': planStep = 1; render(); fadeView(); return;
     case 'p2acc': { const k = t.dataset.tk; if (plan2Off.has(k)) plan2Off.delete(k); else plan2Off.add(k); render(); return; }
     case 'p2done': { const R = buildDay(S, cur, getDay(cur)), SG = suggestFor(cur, simplifyBlocks(R.blocks));
       setDay(cur, D => { D.plan = D.plan || {}; for (const [k, b] of Object.entries(SG.sug)) if (b && !plan2Off.has(k)) D.plan[k] = b; D.planned = true; });
@@ -3392,10 +3397,27 @@ function ddaySheetHTML(){
   return b;
 }
 /* ===== 애플 캘린더처럼: 날짜 줄 + 하루 보기 ===== */
+/* 화면 전체를 살짝 페이드 (단계가 바뀔 때) */
+function fadeView(){ const v = $('#view'); v.classList.remove('fade'); void v.offsetWidth; v.classList.add('fade'); clearTimeout(render.ft); render.ft = setTimeout(() => v.classList.remove('fade'), 450); }
+/* 시트 안에서 고른 날짜가 바뀌면 날짜 줄 아래를 옆으로 밀기 */
+function slideSheetAfter(sel, n){
+  const sb = $('#sbody'), a = sb.querySelector(sel); if (!a) return;
+  let top = a; while (top.parentElement && top.parentElement !== sb) top = top.parentElement;
+  const kids = [...sb.children], els = kids.slice(kids.indexOf(top) + 1), cls = n > 0 ? 'slL' : 'slR';
+  for (const el of els){ el.classList.remove('slL', 'slR'); void el.offsetWidth; el.classList.add(cls); }
+  setTimeout(() => els.forEach(el => el.classList.remove(cls)), 420);
+}
+/* 접는 카드 닫기: 내용이 접히는 걸 보여 준 다음 다시 그린다 */
+function collapseThen(el, fn){
+  if (!el){ fn(); return; }
+  el.style.overflow = 'hidden'; el.style.height = el.offsetHeight + 'px'; void el.offsetHeight;
+  el.style.transition = 'height .24s cubic-bezier(.4,0,.2,1), opacity .18s'; el.style.height = '0px'; el.style.opacity = '0';
+  setTimeout(fn, 230);
+}
 /* 주가 바뀔 때 날짜 아래 내용을 옆으로 밀며 바꾼다 (n>0: 다음 주) */
 function slideIn(n, strip = true){
   const v = $('#view'), kids = [...v.children];
-  const i = kids.findIndex(k => k.classList.contains('wstrip') || k.classList.contains('lsub') && tab === 'week');
+  const i = kids.findIndex(k => k.classList.contains('wstrip') || k.classList.contains('lsub') && (tab === 'week' || tab === 'hw'));
   if (i < 0) return;
   const head = kids[i], els = kids.slice(i + 1).concat(strip ? [...head.querySelectorAll('.wsd, .dt')] : []);
   const cls = n > 0 ? 'slL' : 'slR';
@@ -3571,7 +3593,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t || !EX) return;
   const a = t.dataset.act; if (!a.startsWith('ex')) return;
   switch (a){
-    case 'exopen': { const id = t.dataset.id; if (exOpen.has(id)) exOpen.delete(id); else exOpen.add(id); render(); return; }
+    case 'exopen': { const id = t.dataset.id; if (exOpen.has(id)){ exOpen.delete(id); const c = t.closest('.exc'); collapseThen(c && c.querySelector('.exitems'), render); } else { exOpen.add(id); render(); } return; }
     case 'exck': { const { x } = exFind(t.dataset.s, t.dataset.i); if (x){ x.done = !x.done; saveEX(); } return; }
     case 'expt': { const { x } = exFind(t.dataset.s, t.dataset.i), k = +t.dataset.k; if (!x) return; x.done = x.done || []; x.done = x.done.includes(k) ? x.done.filter(y => y !== k) : x.done.concat(k).sort((p, q) => p - q); saveEX(); return; }
     case 'exall': { const { x } = exFind(t.dataset.s, t.dataset.i); if (!x) return; x.done = (x.done || []).length === x.parts.length ? [] : x.parts.map((_, k) => k); saveEX(); return; }
