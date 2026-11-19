@@ -1200,7 +1200,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "88020baafb01";
+const BUILD = "696b38d547f8";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -3760,6 +3760,32 @@ function printHTML(size, orient){
   .pq-ft .pq-lg{display:flex;gap:${3 * K}mm}
   .pq-ft i{display:inline-block;width:${2 * K}mm;height:${2 * K}mm;margin-right:${.8 * K}mm;vertical-align:-${.3 * K}mm}
   .pq-pn{font-variant-numeric:tabular-nums;letter-spacing:.08em}
+  /* 가로 1쪽: 주간 펼침면 */
+  .pq-wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin-top:${3 * K}mm;height:${(P.h - 2 * P.m - HEAD - FOOT - 3 * K).toFixed(2)}mm;border-left:.15mm solid ${RULE}}
+  .pq-wc{min-width:0;border-right:.15mm solid ${RULE};padding:0 ${1.6 * K}mm;display:flex;flex-direction:column;overflow:hidden;font-size:${P.fs - .3}pt}
+  .pq-wh{border-bottom:.35mm solid ${INK};padding:${.6 * K}mm 0 ${1 * K}mm;margin-bottom:${1 * K}mm}
+  .pq-wh .pq-d1{display:flex;align-items:baseline;gap:${1.2 * K}mm}
+  .pq-wh .pq-d1 b{font-size:${P.fs + 9}pt;font-weight:800;line-height:.9;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+  .pq-wh .pq-d1 span{font-size:${P.fs + 1}pt;font-weight:800}
+  .pq-wh .pq-d2{font-size:${P.sm - .6}pt;color:${MID};font-weight:600;margin-top:${.6 * K}mm;white-space:nowrap;overflow:hidden}
+  .pq-wh .pq-d2 em{font-style:normal;font-weight:800;color:#d93a2b}
+  .pq-wc.pq-we .pq-d1 b,.pq-wc.pq-we .pq-d1 span{color:${MID}}
+  .pq-wc.pq-ex .pq-d1 b,.pq-wc.pq-ex .pq-d1 span{color:#d93a2b}
+  .pq-wl{flex:none}
+  .pq-wm{flex:1;min-height:0;margin-top:${1.2 * K}mm;background-image:repeating-linear-gradient(transparent 0 ${(5.8 * K - .15).toFixed(2)}mm,${HAIR} ${(5.8 * K - .15).toFixed(2)}mm ${(5.8 * K).toFixed(2)}mm)}
+  .pq-we1{display:flex;gap:${1 * K}mm;align-items:baseline;padding:${.9 * K}mm 0 ${.3 * K}mm;border-top:.12mm solid ${HAIR};line-height:1.25}
+  .pq-wl > :first-child{border-top:0}
+  .pq-we1 .pq-t{flex:none;width:2.6em;font-size:.86em;font-weight:700;font-variant-numeric:tabular-nums}
+  .pq-we1 .pq-l{min-width:0;font-weight:800;word-break:keep-all;overflow-wrap:anywhere}
+  .pq-we1 .pq-l i{display:inline-block;width:.6em;height:.6em;background:var(--c,${LIGHT});margin-right:.35em;vertical-align:.05em}
+  .pq-we1 .pq-l small{font-weight:500;color:${MID};font-size:.86em;font-variant-numeric:tabular-nums}
+  .pq-we1.pq-mu .pq-t,.pq-we1.pq-mu .pq-l{color:${MID};font-weight:600}
+  .pq-wt{display:flex;gap:${.9 * K}mm;align-items:flex-start;padding:${.35 * K}mm 0 ${.35 * K}mm 2.6em;line-height:1.28;font-size:.95em}
+  .pq-wt .pq-cb{width:1.05em;height:1.05em;margin-top:.12em}
+  .pq-wt .pq-n{min-width:0;word-break:keep-all;overflow-wrap:anywhere}
+  .pq-wt .pq-n small{color:${MID}}
+  .pq-wt.pq-dn .pq-n{color:${LIGHT};text-decoration:line-through}
+  .pq-wz{flex:none;border-top:.15mm solid ${RULE};padding-top:${.8 * K}mm;margin-top:${.6 * K}mm;font-size:${P.sm - .4}pt;color:${MID};text-align:right;font-variant-numeric:tabular-nums}
   /* 2쪽부터: 단 */
   .pq-cols{display:grid;grid-template-columns:repeat(${COLS},minmax(0,1fr));column-gap:${6 * K}mm;margin-top:${3.6 * K}mm;height:${(P.h - 2 * P.m - HEAD - FOOT - 3.6 * K).toFixed(2)}mm}
   .pq-col{min-width:0;height:100%;overflow:hidden;position:relative}
@@ -3809,6 +3835,7 @@ function printHTML(size, orient){
   const eyebrow = `${mon.getFullYear()} · ${wkNo}주차`;
 
   // ── 1쪽: 주간 시간표 ──
+  if (!LAND){
   h += `<div class="pq-page">${header(eyebrow + ' · 주간 시간표', range)}<div class="pq-g">`;
   W.days.forEach((x, i) => { const dw = dowOf(x.d), ex = inDday(x.d); const dd = ddFor(x.d), st = dur(studyOf(x)); h += `<div class="pq-dh ${dw === 0 || dw === 6 ? 'pq-we' : ''} ${ex ? 'pq-ex' : ''}" style="grid-column:${i + 2}"><div class="pq-d1"><span>${DAYS[dw]}</span><b>${parseYmd(x.d).getDate()}</b></div><div class="pq-d2">${dd ? `<em>${dd.big}</em>` : ''}${dd && st && !(A5 && !LAND) ? ' · ' : ''}${A5 && !LAND ? '' : st}</div></div>`; });
   for (let m = W.lo; m <= W.hi; m += 30){
@@ -3837,6 +3864,25 @@ function printHTML(size, orient){
     }
   });
   h += `</div><div class="pq-ft">${legend}<span class="pq-pn">1</span></div></div>`;
+  } else {
+  // 가로: 시간 비율 칸 대신 요일마다 순서대로 적는 주간 펼침면 (가로는 세로 길이가 짧아 시간 비율로 그리면 글자가 뭉개진다)
+  h += `<div class="pq-page">${header(eyebrow + ' · 주간 계획', range)}<div class="pq-wk">`;
+  W.days.forEach(x => {
+    const dw = dowOf(x.d), ex = inDday(x.d), dd = ddFor(x.d), st = dur(studyOf(x));
+    let c = `<div class="pq-wc ${dw === 0 || dw === 6 ? 'pq-we' : ''} ${ex ? 'pq-ex' : ''}"><div class="pq-wh"><div class="pq-d1"><b>${parseYmd(x.d).getDate()}</b><span>${DAYS[dw]}</span></div><div class="pq-d2">${dd ? `<em>${dd.big}</em>` : ''}${dd && st ? ' · ' : ''}${st ? '공부 ' + st : ''}</div></div><div class="pq-wl">`;
+    const wk = x.B.find(b => b.type === 'wake');
+    if (wk) c += `<div class="pq-we1 pq-mu"><span class="pq-t">${fmt(wk.s)}</span><span class="pq-l">기상</span></div>`;
+    for (const b of x.B){
+      if (b.type === 'wake' || b.type === 'rest') continue;
+      const [col] = pal(b), muted = ['school','travel','meal'].includes(b.type), tl = (x.T[b.key] || []).filter(it => !it.out);
+      c += `<div class="pq-we1 ${muted ? 'pq-mu' : ''}" style="--c:${col}"><span class="pq-t">${fmt(b.s)}</span><span class="pq-l"><i></i>${esc(shortLabel(b))}<small>${b.type === 'school' || b.e - b.s >= 60 ? ' ~' + fmt(b.e) : ''}</small></span></div>`;
+      for (const it of tl) c += `<div class="pq-wt ${it.t.done ? 'pq-dn' : ''}"><i class="pq-cb ${it.t.done ? 'pq-on' : ''}"></i><span class="pq-n">${esc(wkTaskName(it.t))}${it.cont ? ' <small>(이어서)</small>' : ''}</span></div>`;
+    }
+    c += `</div><div class="pq-wm"></div><div class="pq-wz">취침 ${fmt(x.R.sleep)}</div></div>`;
+    h += c;
+  });
+  h += `</div><div class="pq-ft">${legend}<span class="pq-pn">1</span></div></div>`;
+  }
 
   // ── 2쪽부터: 흘려 넣을 조각들. 한 조각 = 한 줄(또는 안 쪼개지는 덩어리). paginate()가 단과 쪽으로 나눈다 ──
   let flow = '';
@@ -3878,6 +3924,8 @@ function printHTML(size, orient){
    먼저 80%까지 줄여 보고, 그래도 넘치면 앞의 시각(칸 위치로 알 수 있음)을 빼고, 최소 55%까지 줄인다. */
 function fitGrid(root){
   const over = el => el.scrollHeight > el.clientHeight + .5 || el.scrollWidth > el.clientWidth + .5;
+  /* 가로 펼침면: 요일 칸이 넘치면 그 요일만 글자를 줄인다 */
+  root.querySelectorAll('.pq-wc').forEach(c => { const l = c; const base = parseFloat(getComputedStyle(c).fontSize); let f = 1; while (over(l) && f > .6){ f -= .04; c.style.fontSize = (base * f).toFixed(2) + 'px'; } });
   root.querySelectorAll('.pq-tq, .pq-bk').forEach(el => {
     if (!over(el)) return;
     const base = parseFloat(getComputedStyle(el).fontSize); let f = 1;
