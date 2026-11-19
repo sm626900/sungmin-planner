@@ -1200,7 +1200,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "d7a1bd6cb375";
+const BUILD = "81dbff13cb62";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -3683,7 +3683,7 @@ function printHTML(size, orient){
   if (LAND){ const t = P.w; P.w = P.h; P.h = t; }
   const COLS = A5 ? (LAND ? 2 : 1) : (LAND ? 3 : 2);
   const W = weekData(weekStart), td = today();
-  const HEAD = 19 * P.k, DH = 10 * P.k, FOOT = 6 * P.k;
+  const HEAD = 19 * P.k, DH = 13 * P.k, FOOT = 6 * P.k;
   const gridH = P.h - 2 * P.m - HEAD - DH - FOOT;
   const u = gridH / W.n;  // 10분당 mm
   const INK = '#1a1a1a', MID = '#6b6b6b', LIGHT = '#a3a3a3', RULE = '#d9d9d9', HAIR = '#ececec', ACC = '#1f4e8c';
@@ -3696,7 +3696,9 @@ function printHTML(size, orient){
   const mon = parseYmd(weekStart), sun = parseYmd(addDays(weekStart, 6));
   const jan1 = new Date(mon.getFullYear(), 0, 1), wkNo = Math.ceil(((mon - jan1) / 864e5 + ((jan1.getDay() + 6) % 7) + 1) / 7);
   const total = W.days.reduce((a, x) => a + studyOf(x), 0);
-  const DD = ddList(td).slice(0, 2).map(x => `<div class="pq-st pq-stx"><small>${esc(x.name)}</small><b>${ddLabel(x, td).big}</b></div>`).join('');
+  /* 종이는 날짜가 안 바뀌므로 머리에는 D-숫자 대신 날짜를, 요일마다 그날 기준 D-숫자를 찍는다 */
+  const DD = ddList(weekStart).slice(0, 2).map(x => `<div class="pq-st pq-stx"><small>${esc(x.name)}</small><b>${md(x.start)}${x.end && x.end !== x.start ? '–' + md(x.end) : ''}</b></div>`).join('');
+  const ddFor = d => { const x = ddList(d)[0]; return x ? { name:x.name, big:ddLabel(x, d).big } : null; };
   const range = `${mon.getMonth() + 1}월 ${mon.getDate()}일 — ${sun.getMonth() !== mon.getMonth() ? (sun.getMonth() + 1) + '월 ' : ''}${sun.getDate()}일`;
   const header = (eyebrow, title) => `<div class="pq-hd"><div class="pq-hl1"><div class="pq-eyebrow">${eyebrow}</div><h1>${title}</h1></div><div class="pq-stats"><div class="pq-st"><small>이번 주 공부</small><b>${dur(total) || '0분'}</b></div>${DD}</div></div>`;
   const K = P.k;
@@ -3721,28 +3723,30 @@ function printHTML(size, orient){
   /* 1쪽: 시간표 */
   .pq-g{margin-top:${2.4 * K}mm;display:grid;grid-template-columns:${(A5 ? 6 : 8)}mm repeat(7,${((P.w - 2 * P.m - (A5 ? 6 : 8) - 7 * (A5 ? .6 : .9) - .6) / 7).toFixed(2)}mm);grid-template-rows:${(DH - 2.4 * K).toFixed(2)}mm repeat(${W.n}, ${u.toFixed(3)}mm);column-gap:${(A5 ? .6 : .9)}mm;width:${(P.w - 2 * P.m).toFixed(2)}mm;overflow:hidden}
   .pq-g>*{min-width:0}
-  .pq-dh{grid-row:1;display:flex;align-items:baseline;justify-content:center;gap:${1 * K}mm;border-bottom:.3mm solid ${INK};margin-bottom:${1 * K}mm;padding-bottom:${.6 * K}mm}
+  .pq-dh{grid-row:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${.4 * K}mm;border-bottom:.3mm solid ${INK};margin-bottom:${1 * K}mm;padding-bottom:${.6 * K}mm;white-space:nowrap;overflow:hidden}
+  .pq-dh .pq-d1{display:flex;align-items:baseline;gap:${1 * K}mm}
+  .pq-dh .pq-d2{font-size:${P.sm - .9}pt;color:${MID};font-weight:600;font-variant-numeric:tabular-nums}
+  .pq-dh .pq-d2 em{font-style:normal;font-weight:800;color:#d93a2b}
   .pq-dh span{font-size:${P.sm}pt;font-weight:700;color:${MID}}
   .pq-dh b{font-size:${P.fs + 3}pt;font-weight:800;letter-spacing:-.03em;line-height:1}
-  .pq-dh small{font-size:${P.sm - .8}pt;color:${MID};font-weight:600;font-variant-numeric:tabular-nums;margin-left:${.6 * K}mm}
   .pq-dh.pq-we span,.pq-dh.pq-we b{color:${LIGHT}}
   .pq-dh.pq-ex b,.pq-dh.pq-ex span{color:#d93a2b}
   .pq-hl{grid-column:1;font-size:${P.sm - .4}pt;font-weight:600;color:${LIGHT};text-align:right;padding-right:${1.2 * K}mm;align-self:start;line-height:1;margin-top:-${P.sm * .16}mm;font-variant-numeric:tabular-nums}
   .pq-ln{grid-column:2/-1;border-top:.15mm solid ${RULE};align-self:start;height:0}
   .pq-ln.pq-h{border-top:.12mm dotted ${RULE}}
   .pq-bk{position:relative;overflow:hidden;padding:${.5 * K}mm ${.8 * K}mm ${.3 * K}mm ${1.5 * K}mm;margin:0 0 ${.3 * K}mm;font-size:${P.fs - .6}pt;line-height:1.15;border:.15mm solid ${RULE};border-left:${.7 * K}mm solid var(--c);background:var(--f)}
-  .pq-bk b{display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${INK}}
-  .pq-bk .pq-tm{display:block;overflow:hidden;text-overflow:ellipsis;font-size:${P.sm - .6}pt;color:${MID};white-space:nowrap;font-variant-numeric:tabular-nums}
+  .pq-bk b{display:block;font-weight:700;color:${INK};word-break:keep-all;overflow-wrap:anywhere}
+  .pq-bk .pq-tm{display:block;font-size:.84em;font-weight:500;color:${MID};font-variant-numeric:tabular-nums}
   .pq-bk.pq-mu{border-color:${HAIR};border-left-color:${LIGHT}}
   .pq-bk.pq-mu b{color:${MID};font-weight:600}
-  .pq-bk .pq-si{display:block;font-size:${P.sm - .4}pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:${.3 * K}mm}
+  .pq-bk .pq-si{display:block;font-size:.9em;font-weight:500;word-break:keep-all;overflow-wrap:anywhere;margin-top:${.3 * K}mm}
   .pq-tq{position:relative;z-index:2;margin-left:${1.5 * K}mm;border-top:.12mm dotted ${LIGHT};overflow:hidden;font-size:${P.sm - .3}pt;line-height:1.18;padding:${.35 * K}mm ${.5 * K}mm 0 ${.3 * K}mm}
-  .pq-tq .pq-r{display:flex;gap:${.7 * K}mm;align-items:flex-start}
+  .pq-tq .pq-r{display:flex;gap:${.6 * K}mm;align-items:flex-start}
+  .pq-tq .pq-cb{width:1.15em;height:1.15em;margin-top:.1em}
   .pq-cb{flex:none;display:inline-block;width:${1.9 * K}mm;height:${1.9 * K}mm;border:.22mm solid ${INK};margin-top:${.2 * K}mm;background:#fff;position:relative}
   .pq-cb.pq-on::after{content:'';position:absolute;left:22%;top:-8%;width:35%;height:70%;border:solid ${INK};border-width:0 .35mm .35mm 0;transform:rotate(45deg)}
   .pq-tq .pq-t{font-weight:700;font-variant-numeric:tabular-nums;flex:none;color:var(--c)}
   .pq-tq .pq-n{min-width:0;word-break:keep-all;overflow-wrap:anywhere}
-  .pq-tq.pq-one .pq-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pq-tq.pq-dn .pq-n{color:${LIGHT};text-decoration:line-through}
   .pq-ov{z-index:3;justify-self:end;align-self:end;font-size:${P.sm - .8}pt;color:#c96a00;font-weight:800;padding:0 ${.6 * K}mm;background:#fff}
   .pq-ft{position:absolute;left:${P.m}mm;right:${P.m}mm;bottom:${P.m}mm;height:${FOOT - 1.8}mm;display:flex;align-items:flex-end;justify-content:space-between;font-size:${P.sm - .4}pt;color:${MID};border-top:.15mm solid ${RULE};padding-top:${1 * K}mm}
@@ -3759,6 +3763,7 @@ function printHTML(size, orient){
   .pq-day .pq-dw{display:flex;flex-direction:column;gap:${.3 * K}mm;padding-bottom:${.2 * K}mm}
   .pq-day .pq-dw span{font-size:${P.fs + 1}pt;font-weight:800}
   .pq-day .pq-dw small{font-size:${P.sm - .4}pt;color:${MID};font-weight:600}
+  .pq-day .pq-dx{font-style:normal;font-weight:800;color:#d93a2b}
   .pq-day em{margin-left:auto;font-style:normal;text-align:right;display:flex;flex-direction:column;gap:${.3 * K}mm;padding-bottom:${.2 * K}mm}
   .pq-day em small{font-size:${P.sm - .8}pt;color:${MID};font-weight:600;letter-spacing:.04em}
   .pq-day em i{font-style:normal;font-size:${P.fs + .6}pt;font-weight:800;font-variant-numeric:tabular-nums}
@@ -3798,7 +3803,7 @@ function printHTML(size, orient){
 
   // ── 1쪽: 주간 시간표 ──
   h += `<div class="pq-page">${header(eyebrow + ' · 주간 시간표', range)}<div class="pq-g">`;
-  W.days.forEach((x, i) => { const dw = dowOf(x.d), ex = inDday(x.d); h += `<div class="pq-dh ${dw === 0 || dw === 6 ? 'pq-we' : ''} ${ex ? 'pq-ex' : ''}" style="grid-column:${i + 2}"><span>${DAYS[dw]}</span><b>${parseYmd(x.d).getDate()}</b>${A5 && !LAND ? '' : `<small>${dur(studyOf(x)) || ''}</small>`}</div>`; });
+  W.days.forEach((x, i) => { const dw = dowOf(x.d), ex = inDday(x.d); const dd = ddFor(x.d), st = dur(studyOf(x)); h += `<div class="pq-dh ${dw === 0 || dw === 6 ? 'pq-we' : ''} ${ex ? 'pq-ex' : ''}" style="grid-column:${i + 2}"><div class="pq-d1"><span>${DAYS[dw]}</span><b>${parseYmd(x.d).getDate()}</b></div><div class="pq-d2">${dd ? `<em>${dd.big}</em>` : ''}${dd && st && !(A5 && !LAND) ? ' · ' : ''}${A5 && !LAND ? '' : st}</div></div>`; });
   for (let m = W.lo; m <= W.hi; m += 30){
     const r = Math.min((m - W.lo) / 10 + 2, W.n + 1), full = m % 60 === 0;
     if (full) h += `<div class="pq-hl" style="grid-row:${r}">${String(Math.floor(m / 60) % 24).padStart(2, '0')}</div>`;
@@ -3834,7 +3839,8 @@ function printHTML(size, orient){
     const exams = items.filter(b => b.type === 'acad' && /^시험/.test(b.label)).map(b => b.label.replace(/^시험 · /, ''));
     const tasks = Object.values(x.T).flat().filter(it => !it.cont && !it.out);
     const cls = `${dw === 0 || dw === 6 ? 'pq-we' : ''} ${ex ? 'pq-ex' : ''}`;
-    const head = `<b>${dd.getDate()}</b><div class="pq-dw"><span>${DAYS[dw]}요일</span><small>${dd.getMonth() + 1}월${tasks.length ? ' · 할 일 ' + tasks.length + '개' : ''}</small>${exams.length ? `<span class="pq-xt">시험 ${esc(exams.join(' · '))}</span>` : ''}</div><em><small>공부</small><i>${dur(studyOf(x)) || '0분'}</i></em>`;
+    const dx = ddFor(x.d);
+    const head = `<b>${dd.getDate()}</b><div class="pq-dw"><span>${DAYS[dw]}요일</span><small>${dd.getMonth() + 1}월${dx ? ` · <em class="pq-dx">${esc(dx.name)} ${dx.big}</em>` : ''}${tasks.length ? ' · 할 일 ' + tasks.length + '개' : ''}</small>${exams.length ? `<span class="pq-xt">시험 ${esc(exams.join(' · '))}</span>` : ''}</div><em><small>공부</small><i>${dur(studyOf(x)) || '0분'}</i></em>`;
     flow += `<div class="pq-day ${cls}" data-day="${x.d}" data-cont="${esc(`<b>${dd.getDate()}</b><div class="pq-dw"><span>${DAYS[dw]}요일</span><small>이어서</small></div>`)}">${head}</div>`;
     const wk = x.B.find(b => b.type === 'wake');
     if (wk) flow += `<div class="pq-rw pq-mu" style="--c:${PAL.wake[0]}" data-day="${x.d}"><span class="pq-tm">${fmt(wk.s)}</span><span class="pq-sq"></span><span class="pq-lb">기상</span></div>`;
@@ -3861,6 +3867,19 @@ function printHTML(size, orient){
   return h;
 }
 
+/* 1쪽 시간표: 칸에 글자가 안 들어가면 자르지 말고 그 칸만 글자를 줄인다.
+   먼저 80%까지 줄여 보고, 그래도 넘치면 앞의 시각(칸 위치로 알 수 있음)을 빼고, 최소 55%까지 줄인다. */
+function fitGrid(root){
+  const over = el => el.scrollHeight > el.clientHeight + .5 || el.scrollWidth > el.clientWidth + .5;
+  root.querySelectorAll('.pq-tq, .pq-bk').forEach(el => {
+    if (!over(el)) return;
+    const base = parseFloat(getComputedStyle(el).fontSize); let f = 1;
+    const set = () => { el.style.fontSize = (base * f).toFixed(2) + 'px'; };
+    while (over(el) && f > .8){ f -= .05; set(); }
+    if (over(el)){ const t = el.querySelector('.pq-t'); if (t){ t.remove(); f = Math.min(1, f + .1); set(); } }
+    while (over(el) && f > .55){ f -= .05; set(); }
+  });
+}
 /* 2쪽부터: 조각을 단에 차례로 채우고, 넘치면 다음 단·다음 쪽으로. 요일이 단 중간에서 끊기면 '이어서' 머리를 다시 단다.
    요일 머리가 단 맨 아래에 혼자 남지 않게, 머리는 다음 줄과 함께 들어갈 때만 넣는다. */
 function paginate(root){
@@ -3932,6 +3951,7 @@ async function doPrint(size, orient){
   root.innerHTML = `<style>${scoped}</style>` + Array.from(doc.querySelectorAll('.pq-page, .pq-flow')).map(p => p.outerHTML).join('');
   document.body.appendChild(root);
   paginate(root);
+  fitGrid(root);
   try {
     const { jsPDF } = window.jspdf;
     let dim = size === 'A5' ? [148, 210] : [210, 297]; if (orient === 'landscape') dim = [dim[1], dim[0]];
