@@ -1102,7 +1102,7 @@ function buildDay(S, date, D){
   }
   anchors.sort((a,b) => a.s - b.s);
 
-  const ctx = { lunchDone:true, dinnerDone:true, dow, S, blocks:[] }; /* 점심·저녁은 자동으로 넣지 않음 — 직접 추가 */
+  const ctx = { lunchDone:true, dinnerDone:true, dow, S, D, transport, blocks:[] }; /* 점심·저녁은 자동으로 넣지 않음 — 직접 추가 */
   const push = b => { if (b.e - b.s > 0){ if (!b.key){ if (b.type === 'travel' && b.tev){ const k0 = 'tr:' + b.tev + (/^귀가|집으로|→ 집/.test(b.label) ? ':b' : ':t'); b.key = ctx.blocks.some(x => x.key === k0) ? k0 + ':' + b.s : k0; } else b.key = (b.type === 'travel' ? 'tr:' : 'b:') + b.s; } ctx.blocks.push(b); } };
 
   // 기상
@@ -1133,9 +1133,9 @@ function buildDay(S, date, D){
       if (tr > 0) push({ s:A.s - tr, e:A.s, label: A.kind === 'school' ? '등교' : '이동 → ' + placeLabel(A.place, A.ev) + (A.place === 'daechi' ? modeTag(transport) : ''), type:'travel', tev:(A.ev ? (A.ev.extra ? 'x:' + A.ev.id : A.ev.id) : null), tplace:A.place });
     } else if (loc === A.place && loc === 'school' && A.kind !== 'school'){
       /* 학교 → 학교 앞 학원: 언제나 걸어서 */
-      const w = Math.min(+S.nearWalk || 10, Math.max(0, A.s - t));
-      if (A.s - w > t) fillFree(ctx, 'away', t, A.s - w, { beforeAnchor:true, place:placeLabel(loc, locEv) });
-      if (w > 0) push({ s:A.s - w, e:A.s, label:'이동 → 학교 앞 (걸어서)', type:'travel', tev:evKey(A.ev), tplace:'school' });
+      const viaHome = (D.gohome || {})[t], w = Math.min(viaHome ? (+S.schoolMin || 10) : (+S.nearWalk || 10), Math.max(0, A.s - t));
+      if (A.s - w > t) fillFree(ctx, 'away', t, A.s - w, { beforeAnchor:true, place:placeLabel(loc, locEv), next:'school' });
+      if (w > 0) push({ s:A.s - w, e:A.s, label:'이동 → 학교 앞' + (viaHome ? modeTag(D.goMode || S.goMode || 'bus') : ' (걸어서)'), type:'travel', tev:evKey(A.ev), tplace:'school' });
     } else if (loc === A.place){
       let gap = A.s - t;
       const trHome = travelTo(S, loc, locEv, transport);
@@ -1147,15 +1147,15 @@ function buildDay(S, date, D){
       } else if (gap > 0 && gap <= 15){
         push({ s:t, e:A.s, label:'이동', type:'travel' });
       } else if (gap > 0){
-        fillFree(ctx, 'away', t, A.s, { beforeAnchor:true, place:placeLabel(loc, locEv) });
+        fillFree(ctx, 'away', t, A.s, { beforeAnchor:true, place:placeLabel(loc, locEv), next:A.place });
       }
     } else if (A.place === 'home' && (leaveOf(locEv) != null || (locEv && locEv.travelBack != null))){
       const trB = backTr(locEv, tr), L = leaveOf(locEv) != null ? Math.max(t, leaveOf(locEv)) : A.s - trB;
-      fillFree(ctx, 'away', t, L, { beforeAnchor:true, place:placeLabel(loc, locEv) });
+      fillFree(ctx, 'away', t, L, { beforeAnchor:true, place:placeLabel(loc, locEv), next:'home' });
       push({ s:L, e:L + trB, label:'이동 → 집', type:'travel', tev:evKey(locEv), tplace:loc });
       if (L + trB < A.s) fillFree(ctx, 'home', L + trB, A.s, { beforeAnchor:true });
     } else {
-      fillFree(ctx, 'away', t, A.s - tr, { beforeAnchor:true, place:placeLabel(loc, locEv) });
+      fillFree(ctx, 'away', t, A.s - tr, { beforeAnchor:true, place:placeLabel(loc, locEv), next:A.place, nextEv:A.ev });
       push({ s:A.s - tr, e:A.s, label:'이동 → ' + placeLabel(A.place, A.ev), type:'travel', tev:(A.place === 'home' || A.place === 'daechi' || A.place === 'school') && locEv ? (locEv.extra ? 'x:' + locEv.id : locEv.id) : (A.ev ? (A.ev.extra ? 'x:' + A.ev.id : A.ev.id) : null), tplace:A.place === 'home' ? loc : A.place });
     }
     if (A.kind === 'school'){
@@ -1168,7 +1168,7 @@ function buildDay(S, date, D){
   if (loc !== 'home'){
     const tb = D.transportBack || transport;   /* 올 때는 따로 (갈 땐 버스, 올 땐 택시 등) */
     const tr = backTr(locEv, travelHome(S, loc, locEv, tb)), L = leaveOf(locEv);
-    if (L != null && L > t){ fillFree(ctx, 'away', t, L, { place:placeLabel(loc, locEv) }); t = L; }
+    if (L != null && L > t){ fillFree(ctx, 'away', t, L, { place:placeLabel(loc, locEv), next:'home' }); t = L; }
     /* 귀가는 마음대로 넣지 않고 물어본다(시간표에 '+ 귀가' 버튼). 교회처럼 오가는 시간을 정해 둔 곳만 자동으로 넣는다. */
     const fixedBack = loc === 'other' || (locEv && locEv.travelBack != null);
     if (fixedBack){ push({ s:t, e:t+tr, label:'귀가' + (loc === 'daechi' ? modeTag(tb) : ''), type:'travel', tev:locEv ? (locEv.extra ? 'x:' + locEv.id : locEv.id) : null, tplace:loc }); t += tr; }
@@ -1280,6 +1280,20 @@ function applyOverlays(blocks, D, wake, sleep, isSchool){
 function fillFree(ctx, where, s, e, opts){
   if (e - s <= 0) return;
   const S = ctx.S, fixed = [];
+  /* 학교 앞에서는 자습하지 않는다: 비는 시간은 '빈 시간'으로 두고, 집에 갔다 오기를 고르면 귀가 · 집 공부 · 다시 이동으로 채운다 */
+  if (where === 'away' && opts.place === PLACES.school){
+    const D = ctx.D || {}, nx = opts.next || null;
+    if (nx && (D.gohome || {})[s]){
+      const back = +S.homeMin || 20;   /* 다시 나가는 이동은 뒤에서 이미 넣는다 */
+      if (e - s > back + 10){
+        ctx.blocks.push({ s, e:s + back, label:'귀가' + modeTag(D.backMode || S.backMode || 'walk'), type:'travel', key:'th:' + s, tplace:'school' });
+        fillFree(ctx, 'home', s + back, e, {});
+        return;
+      }
+    }
+    ctx.blocks.push({ s, e, label:'빈 시간', type:'free', key:'away:' + s, away:{ s, e, next:nx } });
+    return;
+  }
   const free = (a, b) => !fixed.some(f => a < f.e && b > f.s);
   const add = (a, b, label, type, key) => { if (b > a && a >= s && b <= e && free(a, b)){ fixed.push({s:a, e:b, label, type, key}); return true; } return false; };
   if (!ctx.lunchDone){
@@ -1338,7 +1352,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "a311273f8976";
+const BUILD = "8b31b00f9d63";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1605,7 +1619,7 @@ function sub(path, cb0){
 }
 /* 기본 주간 일정: 손대지 않은 날은 기본 주의 같은 요일을 그대로 따름 */
 const TPL_SKIP = ['checks','done','closed','planned','dad','my','noBreakMent','fromTpl'];
-const OWN_KEYS = ['plan','todos','yaja','seg','acad','lbl','mins','ord','at','blk','skipDaily','skipPart','noSchool','tags','wake','sleep','gap','transport','myTarget','noLunch','tplOff','checks','done','skipMy','noAsk','transportBack'];
+const OWN_KEYS = ['plan','todos','yaja','seg','acad','lbl','mins','ord','at','blk','skipDaily','skipPart','noSchool','tags','wake','sleep','gap','transport','myTarget','noLunch','tplOff','checks','done','skipMy','noAsk','transportBack','gohome','goMode','backMode'];
 function tplFor(date){ const T = S.weekTpl; if (!T || !T.from || !T.days || date < T.from) return null; return T.days[dowOf(date)] || null; }
 function hasOwn(D){ return OWN_KEYS.some(k => { const v = D[k]; return v != null && v !== false && !(typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length) && !(Array.isArray(v) && !v.length); }) || (D.extra || []).some(x => !x.flex); }
 const getDay = date => { const D = DAYDOC[date] || {}, t = tplFor(date); if (!t || hasOwn(D)) return D; const m = clone(t); m.extra = (m.extra || []).concat(D.extra || []); if (!m.extra.length) delete m.extra; m.fromTpl = true; return m; };
@@ -2588,6 +2602,12 @@ function yajaPick(date, R, dA){
   const def = S.yajaDefault[dowOf(date)];
   return grp('이 날 야자 몇 교시까지', opts.map(([k, l]) => `<button class="rw tap" data-act="bleave" data-v="${k}" ${dA}><div class="mid"><div class="tt">${l}${k === def ? ' <span class="tmin">기본</span>' : ''}</div><div class="st">학교에서 ${fmt(LEAVE[k])} 출발</div></div>${R.yaja === k ? IC.tick : ''}</button>`).join(''), '이 날만 바뀝니다. 빠진 야자 칸에 넣어 둔 할 일은 집 공부 칸으로 옮겨집니다.');
 }
+/* 공부 칸 장소: 집 / 학교 / 대치 / 스터디카페 / 독서실 */
+function placeRow(b, dA){
+  const P = [['home','집'],['학교','학교'],['대치','대치'],['스터디카페','스터디카페'],['독서실','독서실']];
+  const curP = /^집/.test(b.label) || b.label === '공부' ? 'home' : ((b.label.match(/\(([^)]+)\)/) || [])[1] || '');
+  return grp('어디서', `<div class="rw"><div class="mid"><div class="durpills">${P.map(([k, l]) => `<button class="${curP === k ? 'on' : ''}" data-act="bplace" data-v="${k}" ${dA}>${l}</button>`).join('')}</div></div></div>`, '이름이 \'집 공부\'나 \'자습 (대치)\'처럼 바뀝니다.');
+}
 function blkSheetHTML(st){
   const { R, b } = findBlock(st.date, st.key);
   if (!b) return { title:'일정', body:'<div class="sf" style="padding:0 16px">일정이 바뀌었습니다. 시간표에서 다시 눌러 주세요.</div>' };
@@ -2635,13 +2655,20 @@ function blkSheetHTML(st){
       + (['rest','meal'].includes(b.type) && !o.study ? `<button class="rw tap danger" data-act="delask" ${dA}><div class="mid"><div class="tt">지우기</div></div></button>` : ''));
   } else if (st.key === 'lunch'){
     body = head(fmt(b.s) + '–' + fmt(b.e)) + grp('점심', timeRow('blunch', fmt(b.s), fmt(b.e)) + `<div class="rw"><div class="mid"><div class="tt">점심 빼고 공부하기</div></div>${sw(false,'bnolunch',dA)}</div>`, '시간을 바꾸면 그 시간에 점심이 들어가.');
+  } else if (b.type === 'free' && !b.cx){
+    title = '빈 시간';
+    const A = b.away || { s:b.s, e:b.e, next:null };
+    body = head(fmt(b.s) + '–' + fmt(b.e)) + `<div class="sf" style="padding:0 16px 14px">학교 앞에서 비는 시간입니다.</div>`;
+    if (A.next) body += grp('', `<button class="rw tap add" data-act="gohome" data-d="${st.date}" data-s="${A.s}"><div class="mid"><div class="tt">집에 갔다 오기</div><div class="st">귀가 · 집 공부 · ${A.next === 'home' ? '' : '다시 이동'}</div></div></button>`);
+    body += grp('이 시간에 넣기', [['study','공부'],['rest','쉬는 시간'],['meal','식사'],['travel','이동']].map(([k, l]) => `<button class="rw tap" data-act="freefill" data-v="${k}" data-d="${st.date}" data-s="${b.s}" data-e="${b.e}"><div class="mid"><div class="tt">${l}</div></div></button>`).join('')
+      + `<button class="rw tap add" data-act="openadd" data-d="${st.date}" data-s="${b.s}" data-e="${b.e}" data-kind="event"><div class="mid"><div class="tt">일정 · 학원</div></div>${IC.chv}</button>`);
   } else if (st.key.startsWith('cx:') && b.cx && b.cx.kind === 'free'){
     title = '빈 시간';
     body = head(fmt(b.s) + '–' + fmt(b.e)) + grp('이 시간에 넣기', [['study','공부'],['rest','쉬는 시간'],['meal','식사'],['travel','이동']].map(([k, l]) => `<button class="rw tap" data-act="bcxkind" data-v="${k}" ${dA}><div class="mid"><div class="tt">${l}</div></div></button>`).join('')
       + `<button class="rw tap add" data-act="openadd" data-d="${st.date}" data-s="${b.s}" data-e="${b.e}" data-kind="event"><div class="mid"><div class="tt">일정 · 학원</div></div>${IC.chv}</button>`) + grp('', timeRow('bcxtime', b.cx.start, b.cx.end));
   } else if (st.key.startsWith('cx:') && b.type !== 'travel'){
     const x = b.cx;
-    body = head(fmt(b.s) + '–' + fmt(b.e)) + mergeRow;
+    body = head(fmt(b.s) + '–' + fmt(b.e)) + mergeRow + (x.kind === 'study' ? placeRow(b, dA) : '');
     body += grp('', `<div class="rw"><div class="mid"><div class="tt">이름</div></div><input type="text" data-keep="1" data-act="bcxname" ${dA} value="${esc(x.name)}"></div>` + timeRow('bcxtime', x.start, x.end)
       + `<div class="rw"><div class="mid">${seg([['meal','식사'],['rest','쉬기'],['study','공부'],['travel','이동']], x.kind, 'bcxkind', dA)}</div></div>` + (x.kind === 'study' ? `<div class="rw"><div class="mid">${TAGSEG(x.tag, dA)}</div></div>` : ''));
     body += taskSec;
@@ -2671,7 +2698,7 @@ function blkSheetHTML(st){
     body = head(fmt(b.s) + '–' + fmt(b.e)) + `<div class="sf" style="padding:0 16px 14px">비는 시간이라 쉬는 시간으로 넣었습니다.</div>`
       + grp('', putOther + `<button class="rw tap danger" data-act="delask" ${dA}><div class="mid"><div class="tt">지우기</div></div></button>`);
   } else {
-    body = head(fmt(b.s) + '–' + fmt(b.e)) + mergeRow;
+    body = head(fmt(b.s) + '–' + fmt(b.e)) + mergeRow + (STUDYT.includes(b.type) ? placeRow(b, dA) : '');
     body += grp('시간', timeRow('bblktime', fmt(b.s), fmt(b.e)) + ((D.blk || {})[st.key] || Object.keys(D.blk || {}).some(k => (b.members || [b.s]).some(m => k === st.key.replace(/:\d+\+?$/, ':') + m)) ? `<button class="rw tap add" data-act="blkreset" ${dA}><div class="mid"><div class="tt">원래대로</div></div></button>` : ''), '줄이거나 옮기면 비는 시간은 쉬는 시간이 됩니다.');
     body += taskSec;
     if (STUDYT.includes(b.type)) body += grp('중간에 넣기', `<button class="rw tap add" data-act="openadd" data-kind="rest" data-d="${st.date}" data-s="${b.s + 50}" data-e="${b.s + 60}"><div class="mid"><div class="tt">+ 쉬는 시간</div></div></button><button class="rw tap add" data-act="openadd" data-kind="travel" data-d="${st.date}" data-s="${b.s + 60}" data-e="${b.s + 90}"><div class="mid"><div class="tt">+ 이동</div></div></button><button class="rw tap add" data-act="openbreaks" data-d="${st.date}"><div class="mid"><div class="tt">쉬는 시간 추천 받기</div></div></button>`, '넣으면 뒤에 있는 할 일이 그만큼 뒤로 밀립니다.');
@@ -3117,6 +3144,12 @@ document.addEventListener('click', e => {
     case 'sheetsave': sheetSave(); return;
     case 'bcxtr': { const f = t.dataset.f; setDay(d, D => { const x = (D.extra||[]).find(y => 'cx:' + y.id === t.dataset.k); if (x) trApply(x, f, v); }); return; }
     case 'addtrp': { readAdd(); trApply(sheet.form, t.dataset.f, v); render(); return; }
+    case 'gohome': { const a = +t.dataset.s; setDay(d, D => { D.gohome = Object.assign({}, D.gohome, { [a]:true }); }); sheet = null; render(); toast('집에 갔다 오는 걸로 넣었습니다'); return; }
+    case 'freefill': { const a = +t.dataset.s, z = +t.dataset.e, nm = ({ study:'공부', rest:'쉬는 시간', meal:'식사', travel:'이동' })[v]; setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:nm, start:fmt(a), end:fmt(z), kind:v, tag: v === 'study' ? 'hw' : undefined, place:'here' }); }); sheet = null; render(); return; }
+    case 'bplace': { const k = t.dataset.k, nm = v === 'home' ? '집 공부' : '자습 (' + v + ')';
+      if (k.startsWith('cx:')) setDay(d, D => { const x = (D.extra||[]).find(y => 'cx:' + y.id === k.replace(/\+$/, '')); if (x) x.name = nm; });
+      else { const keys = blkKeysOf(d, k); setDay(d, D => { D.lbl = D.lbl || {}; for (const kk of keys) D.lbl[kk] = nm; }); }
+      return; }
     case 'noask': { const a = +t.dataset.s; setDay(d, D => { D.noAsk = Object.assign({}, D.noAsk, { [a]:true }); }); toast('이 날은 묻지 않습니다'); return; }
     case 'addtr': { const a = +t.dataset.s, n = +t.dataset.n, nm = t.dataset.mode ? '귀가' + modeTag(t.dataset.mode) : (t.dataset.l || '이동').replace(/ 넣기$/, ''); const fr = t.dataset.from, md = t.dataset.mode || undefined; setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:nm, start:fmt(a), end:fmt(a + n), kind:'travel', place:'here', ...(fr ? { from:fr, to:'home', mode:md } : {}) }); }); toast(fmt(a) + '–' + fmt(a + n) + ' ' + nm + ' 넣었습니다'); return; }
     case 'delask': openSheet({ type:'fill', date:d, key:t.dataset.k, prev:null }); return;
