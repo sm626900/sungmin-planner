@@ -1352,7 +1352,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "ea956c1493de";
+const BUILD = "42ea0c2c9352";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1635,17 +1635,24 @@ function makeTpl(ws){
   }
   return days;
 }
-function setDay(date, fn){ const d = clone(getDay(date)); delete d.fromTpl; fn(d); DAYDOC[date] = d; save('days/' + date, d); render(); }
+/* 아직 불러오지 않은 날에 쓰면 서버에 있던 그날 내용을 덮어쓴다 → 먼저 불러온 뒤에 쓴다 */
+const WAIT = {};
+function ensureDay(d, cb){
+  if (d in DAYDOC){ if (cb) cb(); return; }
+  if (cb) (WAIT[d] = WAIT[d] || []).push(cb);
+  const p = 'days/' + d;
+  if (!subs[p]) sub(p, data => { if (running[p] || pend[p]) return; DAYDOC[d] = data ? clone(data) : {}; const w = WAIT[d]; delete WAIT[d]; if (w) w.forEach(f => f()); render(); });
+}
+function setDay(date, fn){
+  if (db && !(date in DAYDOC)){ ensureDay(date, () => setDay(date, fn)); return; }
+  const d = clone(getDay(date)); delete d.fromTpl; fn(d); DAYDOC[date] = d; save('days/' + date, d); render(); }
 function ensureDays(){
   const want = new Set();
   for (let i = -7; i < 14; i++) want.add(addDays(weekStart, i));   /* 앞뒤 주도 미리 받아 두면 주를 넘길 때 덜컥거리지 않는다 */
   for (let i = -1; i <= 1; i++){ want.add(addDays(cur, i)); want.add(addDays(selDate, i)); want.add(addDays(liveDay(), i)); }
   const ws2 = weekStartOf(selDate); for (let i = 0; i < 7; i++) want.add(addDays(ws2, i));
   if (typeof EX !== 'undefined' && EX && EX.subjects) for (const s of EX.subjects) if (s.date >= today()) for (let i = 1; i <= 7; i++) want.add(addDays(s.date, -i));   /* 시험 전 직보 */
-  for (const d of want){
-    const p = 'days/' + d;
-    if (!subs[p]) sub(p, data => { if (running[p] || pend[p]) return; DAYDOC[d] = data ? clone(data) : {}; render(); });
-  }
+  for (const d of want) ensureDay(d);
   for (const ws of new Set([weekStart, weekStartOf(cur), weekStartOf(selDate)])){
     const p = 'weeks/' + ws;
     if (!subs[p]) sub(p, data => { if (running[p] || pend[p]) return; WEEKDOC[ws] = data ? clone(data) : null; render(); });
@@ -3082,7 +3089,7 @@ function timesSheetHTML(){
 }
 
 /* ===== 동작 ===== */
-function ensureWeek(ws){ for (let i = 0; i < 7; i++){ const d = addDays(ws, i), p = 'days/' + d; if (!subs[p]) sub(p, data => { if (running[p] || pend[p]) return; DAYDOC[d] = data ? clone(data) : {}; render(); }); } }
+function ensureWeek(ws){ for (let i = 0; i < 7; i++) ensureDay(addDays(ws, i)); }
 function findEv(date, key){ return dayEvents(S, date, getDay(date)).find(e => (e.extra ? 'x:' + e.id : e.id) === key); }
 function evApply(date, key, fn){
   setDay(date, D => {
@@ -3295,7 +3302,7 @@ document.addEventListener('click', e => {
     case 'importno': IMPORT = null; render(); return;
     case 'logout': if (FB) FB.signOut(); return;
     case 'fold': { const f = t.dataset.f, fb = FOLD[f] ? t.closest('.fold') && t.closest('.fold').querySelector('.fb') : null; FOLD[f] = !FOLD[f]; try { localStorage.setItem('pl_fold', JSON.stringify(FOLD)); } catch(e){} collapseThen(fb, render); return; }
-    case 'hwwk': { const n = +t.dataset.n; hwWeek = addDays(hwWeek || weekStartOf(today()), n); ensureWeek(hwWeek); { for (let i = 0; i < 7; i++){ const p2 = 'days/' + addDays(hwWeek, i); if (!subs[p2]) sub(p2, data => { if (running[p2] || pend[p2]) return; DAYDOC[p2.slice(5)] = data ? clone(data) : {}; render(); }); } } render(); slideIn(n); return; }
+    case 'hwwk': { const n = +t.dataset.n; hwWeek = addDays(hwWeek || weekStartOf(today()), n); ensureWeek(hwWeek); render(); slideIn(n); return; }
     case 'openfit': ensureDays(); openSheet({ type:'fit', date:d }); return;
     case 'fitmeal': { const [n, a, z] = v.split('|'); setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:n, start:a, end:z, kind:'meal', place:'here' }); }); toast(n + ' 넣었습니다'); return; }
     case 'fitmin': { const tk = t.dataset.tk, P = planFor(d, simplifyBlocks(buildDay(S, d, getDay(d)).blocks)), x = P.tasks.find(y => y.tk === tk); if (!x) return;
