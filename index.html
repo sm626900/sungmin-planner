@@ -838,10 +838,15 @@ body{-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
   .dev .bchk{width:20px;height:20px}
   .dev .bchk svg{width:11px;height:11px}
 }
-.dcal .dev.past{opacity:.42;filter:saturate(.35)}
-.dcal .dev.past:hover{opacity:.7}
-.dcal .tk.slot.past{opacity:.45}
-.dcal .tk.slot.past.on{opacity:.6}
+/* 지난 칸: 칸 색과 칸 이름만 흐리게, 안의 할 일 글씨는 그대로 (아직 안 했을 수도 있으니까) */
+.dcal .dev.past{--c:var(--gray)!important}
+.dcal .dev.past>.dtop,.dcal .dev.past>.dtime{opacity:.45}
+.dcal .dev.rest.past{opacity:.45}
+.dcal .tk.slot.past .st0{opacity:.5}
+/* 컴퓨터: − 값 + 의 값을 눌러 직접 입력 */
+html.desk .step span{cursor:text;border-radius:6px}
+html.desk .step span:hover{background:var(--fill)}
+.step input.stin{width:72px;border:0;background:var(--card);color:var(--text);text-align:center;font:inherit;font-size:14px;padding:4px 2px;border-radius:6px;outline:2px solid var(--tint)}
 .dcal .tk.slot.meal{--c:var(--brown);background:color-mix(in srgb,var(--brown) 14%,var(--card))}
 /* ===== 컴퓨터 화면 (html.desk) ===== */
 html.desk body{padding-left:228px}
@@ -1236,7 +1241,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "f705abf642b8";
+const BUILD = "4a94b3c57e49";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -3177,6 +3182,32 @@ document.addEventListener('change', e => {
 let imeEnter = null, imeOn = false;
 document.addEventListener('compositionstart', () => { imeOn = true; });
 document.addEventListener('compositionend', e => { imeOn = false; if (imeEnter && imeEnter === e.target){ const t = imeEnter; imeEnter = null; setTimeout(() => t.blur(), 0); } });
+/* 컴퓨터: 스테퍼 값을 눌러 키보드로 입력 (예: 90, 1:30, 1시간 30분, 2시간, 3) */
+function parseDur(txt, wasDur){
+  const t = String(txt).trim(); if (!t) return null;
+  let m = t.match(/^(\d+)\s*:\s*(\d{1,2})$/); if (m) return +m[1] * 60 + +m[2];
+  m = t.match(/^(?:(\d+(?:\.\d+)?)\s*(?:시간|h))?\s*(?:(\d+)\s*(?:분|m))?$/i); if (m && (m[1] || m[2])) return Math.round((+m[1] || 0) * 60) + (+m[2] || 0);
+  m = t.match(/^(\d+(?:\.\d+)?)$/); if (m){ const n = +m[1]; return wasDur ? (n <= 9 ? Math.round(n * 60) : Math.round(n)) : Math.round(n); }
+  return null;
+}
+const curOfStep = txt => { const t = txt.trim(); const h = t.match(/(\d+)\s*시간/), mm = t.match(/(\d+)\s*분/); if (h || mm) return { v:(h ? +h[1] * 60 : 0) + (mm ? +mm[1] : 0), dur:true }; const n = t.match(/(\d+)/); return n ? { v:+n[1], dur:false } : null; };
+document.addEventListener('click', e => {
+  if (!DESK) return;
+  const sp = e.target.closest('.step > span'); if (!sp || sp.querySelector('input')) return;
+  const st = sp.parentElement, plus = [...st.querySelectorAll('button[data-n]')].pop(); if (!plus) return;
+  const cur0 = curOfStep(sp.textContent); if (!cur0) return;
+  e.stopPropagation();
+  const inp = document.createElement('input'); inp.className = 'stin'; inp.dataset.keep = '1'; inp.value = sp.textContent.trim(); inp.setAttribute('aria-label', '직접 입력');
+  sp.textContent = ''; sp.appendChild(inp); inp.focus(); inp.select();
+  let done = false;
+  const commit = ok => { if (done) return; done = true;
+    const v = ok ? parseDur(inp.value, cur0.dur) : null;
+    inp.removeAttribute('data-keep'); inp.blur();
+    if (v == null || v === cur0.v){ render(); return; }
+    const b = document.createElement('button'); Object.assign(b.dataset, plus.dataset); b.dataset.n = String(v - cur0.v); b.hidden = true; st.appendChild(b); b.click(); b.remove(); };
+  inp.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.isComposing){ ev.preventDefault(); commit(true); } else if (ev.key === 'Escape'){ ev.preventDefault(); ev.stopPropagation(); commit(false); } });
+  inp.addEventListener('blur', () => commit(true));
+}, true);
 /* 컴퓨터: 단축키 */
 document.addEventListener('keydown', e => {
   const tg = e.target, typing = tg && (/INPUT|TEXTAREA|SELECT/.test(tg.tagName) || tg.isContentEditable);
