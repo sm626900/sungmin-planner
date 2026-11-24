@@ -1286,7 +1286,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "ce4e1da6fe05";
+const BUILD = "24c91d1e5088";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -2322,6 +2322,28 @@ function viewHW(){
 
 /* ===== 시트 ===== */
 function openSheet(s){ sheet = s; render(); }
+/* 야자를 바꿀 때: 더 오래 남게 되면, '집에 가는 날'에 맞춰 넣어 둔 이동·쉬기·공부와 '석식 대신 공부'를 정리해서 석식·야자 칸이 다시 보이게 한다 */
+function setYaja(d, v, msg){
+  let n = 0;
+  setDay(d, D => {
+    const was = buildDay(S, d, D).isSchool ? (LEAVE[D.yaja || S.yajaDefault[dowOf(d)]] || 960) : 960;
+    delete D.noSchool;
+    if (v === S.yajaDefault[dowOf(d)]) delete D.yaja; else D.yaja = v;
+    const now = LEAVE[v] || 960;
+    if (now < was) return;   /* 같은 걸 다시 눌러도 정리한다 */
+    const lo = 960, hi = now, out = [];
+    for (const x of (D.extra || [])){
+      if (x.kind === 'event' || !x.start || !x.end){ out.push(x); continue; }
+      const a = clockMin(x.start), z = clockMin(x.end);
+      if (z <= lo || a >= hi){ out.push(x); continue; }
+      if (x.kind === 'study' && z > hi + 20){ out.push({ ...x, start:fmt(hi) }); n++; continue; }
+      n++;   /* 야자 시간 안에 들어간 이동·쉬기·식사·짧은 공부는 뺀다 */
+    }
+    D.extra = out;
+    if (D.seg) for (const k in D.seg) if (D.seg[k] && D.seg[k].study){ delete D.seg[k].study; n++; }
+  });
+  toast((msg || (v === 'none' ? '야자 안 함' : '학교에서 ' + fmt(LEAVE[v]) + ' 출발')) + (n ? ' · 겹치던 ' + n + '개 정리' : ''));
+}
 /* 창 위 '저장': 고른 것을 적용하고 닫는다 (위에 겹친 창이면 아래 창으로 돌아간다) */
 const FORM_SAVE = { add:'addsave', flex:'fxsave', hw:'hfadd', breaks:'brkadd', jikbo:'exjbsave' };
 function fireAct(act, data){ const b = document.createElement('button'); b.dataset.act = act; Object.assign(b.dataset, data || {}); b.hidden = true; document.body.appendChild(b); b.click(); b.remove(); }
@@ -2925,12 +2947,8 @@ document.addEventListener('click', e => {
     case 'sheetback': if (sheet && sheet.prev){ sheet = sheet.prev; renderSheet.back = true; render(); } return;
     case 'undo': undoChange(d, t.dataset.k); toast('되돌렸습니다'); return;
     case 'yaja': {
-      const dow = dowOf(d);
-      setDay(d, D => {
-        if (v === 'noschool'){ D.noSchool = true; delete D.yaja; return; }
-        delete D.noSchool;
-        if (v === S.yajaDefault[dow]) delete D.yaja; else D.yaja = v;
-      }); return; }
+      if (v === 'noschool'){ setDay(d, D => { D.noSchool = true; delete D.yaja; }); return; }
+      setYaja(d, v); return; }
     case 'trans': setDay(d, D => { const nv = (D.transport || S.defaultTransport) === 'taxi' ? 'bus' : 'taxi'; if (nv === S.defaultTransport) delete D.transport; else D.transport = nv; }); return;
     case 'gap': setDay(d, D => { const nv = (D.gap || S.satGapDefault) === 'home' ? 'stay' : 'home'; if (nv === S.satGapDefault) delete D.gap; else D.gap = nv; }); return;
     case 'openacad': ensureDays(); openSheet({ type:'acad', key:t.dataset.k, date:d || null, prev:sheet }); return;
@@ -3166,7 +3184,7 @@ document.addEventListener('click', e => {
       else setDay(d, D => { D.tags = D.tags || {}; for (const m of (b.members || [b.s])) D.tags[String(m)] = v; });
       return; }
     case 'bsegstudy': setDay(d, D => { D.seg = D.seg || {}; const lb = segLabel(t.dataset.k); D.seg[lb] = D.seg[lb] || {}; D.seg[lb].study = !D.seg[lb].study; if (!D.seg[lb].study) delete D.seg[lb].study; if (!Object.keys(D.seg[lb]).length) delete D.seg[lb]; }); return;
-    case 'bleave': setDay(d, D => { delete D.noSchool; if (v === S.yajaDefault[dowOf(d)]) delete D.yaja; else D.yaja = v; }); toast('학교에서 ' + fmt(LEAVE[v]) + ' 출발'); return;
+    case 'bleave': setYaja(d, v, '학교에서 ' + fmt(LEAVE[v]) + ' 출발'); return;
     case 'bnoschool': setDay(d, D => { if (D.noSchool) delete D.noSchool; else D.noSchool = true; }); return;
     case 'bnolunch': setDay(d, D => { D.noLunch = true; }); sheet = null; render(); toast('점심 칸을 뺐습니다'); return;
     case 'bcxkind': setDay(d, D => { const x = (D.extra||[]).find(y => 'cx:' + y.id === t.dataset.k); if (x){ x.kind = v; if (v === 'study' && !x.tag) x.tag = 'hw'; } }); return;
