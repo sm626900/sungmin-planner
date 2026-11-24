@@ -858,6 +858,14 @@ body.dragmode .dev .tk.slot{transition:transform .18s cubic-bezier(.2,.8,.2,1)}
 .dev .tk.slot.shU{transform:translateY(-5px)}
 .dev .tk.slot.shD{transform:translateY(7px)}
 body.dragmode .dev.dropover{box-shadow:inset 0 0 0 1.5px var(--c)!important;background:color-mix(in srgb,var(--c) 16%,var(--card))!important}
+.rw.msr{padding:0 8px 0 0;min-height:40px;gap:0}
+.msr-a{flex:1;display:flex;align-items:center;gap:10px;border:0;background:none;text-align:left;padding:9px 8px 9px 16px;font-size:14.5px;min-width:0}
+.msr-a svg{margin-left:auto;flex:none}
+.msr-t{font-variant-numeric:tabular-nums;color:var(--sub);font-size:13.5px;white-space:nowrap}
+.msr-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msr-b{flex:none;border:0;background:var(--fill);color:var(--tint);font-size:12.5px;font-weight:600;border-radius:999px;padding:5px 11px}
+.msr-b.on{background:var(--tint);color:#fff}
+html.desk .msr-a:hover{background:color-mix(in srgb,var(--fill) 60%,transparent)}
 /* ===== 컴퓨터 화면 (html.desk) ===== */
 html.desk body{padding-left:228px}
 html.desk .wrap{padding:22px 32px 48px}
@@ -1251,7 +1259,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "3972cca6f79d";
+const BUILD = "3f0e779b67a6";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -2661,12 +2669,19 @@ function addSheetHTML(st){
   b += `<div class="segwrap">${seg([['meal','식사'],['rest','쉬기'],['study','공부'],['travel','이동'],['event','일정·학원']], f.kind, 'addkind')}</div>`;
   const flt = f.kind === 'meal' && f.mode === 'flex';
   if (f.kind === 'meal') b += `<div class="segwrap">${seg([['fixed','시간 정하기'],['flex','할 일 사이에 넣기']], f.mode || 'fixed', 'addmode')}</div>`;
-  b += grp('', `<div class="rw"><div class="mid"><div class="tt">이름</div></div><input type="text" data-keep="1" id="ad-name" value="${esc(f.name)}" placeholder="${ph}"></div>`
+  b += grp('', `<div class="rw"><div class="mid" style="flex:none"><div class="tt">이름</div></div><input type="text" data-keep="1" id="ad-name" value="${esc(f.name)}" placeholder="${ph}"></div>`
     + (flt ? `<div class="rw"><div class="mid"><div class="tt">얼마나</div></div><div class="step"><button data-act="addmin" data-n="-10">−</button><span>${durShort(f.min || 60)}</span><button data-act="addmin" data-n="10">+</button></div></div>`
       : `<div class="rw"><div class="mid" style="flex:none"><div class="tt">시간</div></div><span style="flex:1"></span><input type="time" id="ad-s" value="${f.start}"><span class="val">~</span><input type="time" id="ad-e" value="${f.end}"></div>`)
     + (f.kind === 'study' ? `<div class="rw"><div class="mid">${seg([['hw','숙제'],['my','내 공부'],['memo','암기'],['review','복습']], f.tag, 'addtag')}</div></div>` : '')
     + (f.kind === 'event' ? `<div class="rw"><div class="mid"><div class="tt">장소</div></div><select id="ad-p">${[['home','집'],['school','학교 앞'],['daechi','대치']].map(([k,l]) => `<option value="${k}" ${f.place===k?'selected':''}>${l}</option>`).join('')}</select></div>` : ''));
   if (flt) b += `<div class="sf" style="padding:0 16px 12px">할 일처럼 공부 칸에 들어갑니다. 꾹 눌러서 다른 할 일 사이로 옮길 수 있습니다.</div>`;
+  else {
+    /* 그날 일정: 누르면 그 시작 시각부터, '끝나고'는 끝난 시각부터 (길이는 그대로) */
+    const L = simplifyBlocks(buildDay(S, st.date, getDay(st.date)).blocks, { rests:true }).filter(x => x.e > x.s);
+    const sM = clockMinUI(f.start);
+    const rows = L.map(x => `<div class="rw msr"><button class="msr-a" data-act="addat" data-v="${x.s}"><span class="dot" style="background:${colorOf(x)}"></span><span class="msr-t">${fmt(x.s)}–${fmt(x.e)}</span><span class="msr-n">${esc(x.label)}</span>${sM === x.s ? IC.tick : ''}</button><button class="msr-b ${sM === x.e ? 'on' : ''}" data-act="addat" data-v="${x.e}">끝나고</button></div>`).join('');
+    if (rows) b += grp(shortDate(st.date) + ' 일정', rows, '누르면 그 시간부터 넣습니다. 길이는 그대로입니다.');
+  }
   b += `<button class="btn" data-act="addsave">넣기</button>`;
   return b;
 }
@@ -3075,8 +3090,10 @@ document.addEventListener('click', e => {
       if (sheet && sheet.type === 'when'){ sheet = sheet.prev || null; render(); toast(v === 'none' ? '시간 안 정함' : '옮겼습니다'); } return; }
     case 'openblk': ensureDays(); openSheet({ type:'blk', date:d, key:t.dataset.k, prev: sheet && sheet.type === 'day' ? sheet : null }); return;
     case 'openadd': openSheet({ type:'add', date:d, s: t.dataset.s != null ? +t.dataset.s : null, e: t.dataset.e != null ? +t.dataset.e : null, kind:t.dataset.kind || null, prev:sheet }); return;
-    case 'addkind': readAdd(); sheet.form.kind = v; render(); return;
+    case 'addkind': { readAdd(); const f = sheet.form; if (f.kind !== v && sheet.e == null){ const a = clockMinUI(f.start); f.end = fmt(a + (({ meal:60, rest:10, travel:20, study:60, event:60 })[v] || 30)); } f.kind = v; render(); return; }
     case 'addtag': readAdd(); sheet.form.tag = v; render(); return;
+    case 'addat': { readAdd(); const f = sheet.form, a = clockMinUI(f.start), z = clockMinUI(f.end); let dur = z > a ? z - a : ({ meal:60, rest:10, travel:20, study:60, event:60 })[f.kind] || 30;
+      const s0 = +v; f.start = fmt(s0); f.end = fmt(s0 + dur); render(); return; }
     case 'addmode': readAdd(); sheet.form.mode = v; if (!sheet.form.min) sheet.form.min = 60; render(); return;
     case 'addmin': readAdd(); sheet.form.min = Math.max(10, Math.min(180, (sheet.form.min || 60) + +t.dataset.n)); render(); return;
     case 'addsave': { readAdd(); const f = sheet.form, name = f.name.trim() || ({ meal:'저녁', rest:'쉬기', study:'공부', travel:'이동', event:'일정' })[f.kind];
