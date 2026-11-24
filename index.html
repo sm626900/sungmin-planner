@@ -1338,7 +1338,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "079470547e9c";
+const BUILD = "a311273f8976";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1481,8 +1481,9 @@ async function checkUpdate(){
 setTimeout(checkUpdate, 4000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
 /* ===== 상태 ===== */
-/* 하루는 새벽 6시에 바뀐다 (nowMin과 같은 기준). 밤 12시가 넘어도 06시 전까지는 어제 시간표의 맨 아래(00시~)로 본다. */
-const today = () => ymd(new Date(Date.now() - 6 * 3600 * 1000));
+/* 오늘 = 달력 날짜. 단, '지금' 빨간 줄은 새벽 6시 전까지 어젯밤 시간표의 맨 아래(00시~)에 둔다(liveDay). */
+const today = () => ymd(new Date());
+const liveDay = () => ymd(new Date(Date.now() - 6 * 3600 * 1000));
 let S = defaultSettings();
 let HW = { items: [] };
 const DAYDOC = {};
@@ -1624,7 +1625,7 @@ function setDay(date, fn){ const d = clone(getDay(date)); delete d.fromTpl; fn(d
 function ensureDays(){
   const want = new Set();
   for (let i = -7; i < 14; i++) want.add(addDays(weekStart, i));   /* 앞뒤 주도 미리 받아 두면 주를 넘길 때 덜컥거리지 않는다 */
-  for (let i = -1; i <= 1; i++){ want.add(addDays(cur, i)); want.add(addDays(selDate, i)); want.add(addDays(today(), i)); }
+  for (let i = -1; i <= 1; i++){ want.add(addDays(cur, i)); want.add(addDays(selDate, i)); want.add(addDays(liveDay(), i)); }
   const ws2 = weekStartOf(selDate); for (let i = 0; i < 7; i++) want.add(addDays(ws2, i));
   if (typeof EX !== 'undefined' && EX && EX.subjects) for (const s of EX.subjects) if (s.date >= today()) for (let i = 1; i <= 7; i++) want.add(addDays(s.date, -i));   /* 시험 전 직보 */
   for (const d of want){
@@ -1760,7 +1761,7 @@ function suggestFor(date, blocks){
   const study = P.cand.filter(b => b.type !== 'travel' && b.type !== 'school');
   for (const b of study) cap[b.key] = b.e - b.s;
   for (const t of P.tasks) if (P.map[t.tk] && cap[P.map[t.tk]] != null) cap[P.map[t.tk]] -= t.min;
-  const from = date === today() ? (new Date().getHours() * 60 + new Date().getMinutes() + (new Date().getHours() < 6 ? 1440 : 0)) : 0;
+  const from = date === liveDay() ? (new Date().getHours() * 60 + new Date().getMinutes() + (new Date().getHours() < 6 ? 1440 : 0)) : 0;
   const open = study.filter(b => b.e > from + 10);
   const todo = P.tasks.filter(t => !t.done && !P.map[t.tk]).sort((a, b) => (a.due || '9') < (b.due || '9') ? -1 : (a.due || '9') > (b.due || '9') ? 1 : b.min - a.min);
   const sug = {};
@@ -2178,7 +2179,7 @@ function taskRows(date, list, od){
 /* 오늘 */
 let planStep = null, planStepDate = null;
 function viewToday(){
-  const D = getDay(cur), R = buildDay(S, cur, D), isToday = cur === today();
+  const D = getDay(cur), R = buildDay(S, cur, D), isToday = cur === today(), live = cur === liveDay();
 
   const list = checklist(cur).filter(x => x.kind !== 'meal'), od = isToday ? overdue(cur) : [];
   const total = units(list) + od.length, done = unitsDone(list);
@@ -2200,16 +2201,16 @@ function viewToday(){
     h += `<div class="banner info">${IC.info}<div><b>${fmt(q.s)} ${esc(q.from)} → 집</b> 가는 이동이 없습니다.${M.length > 1 ? '' : ' ' + durShort(q.n) + ' 걸립니다.'}<div class="mbtns">${M.length > 1 ? M.map(m => btn(trMin(fp, 'home', m), MODE_L[m], m)).join('') : btn(q.n, q.label + ' 넣기')}<button class="ci" data-act="noask" data-d="${cur}" data-s="${q.s}">안 넣기</button></div></div></div>`; }
   (R.trims || []).forEach((t, i) => { const w = /^이동|^귀가|^등교/.test(t.with) ? '이동 시간' : t.with;
     h += `<div class="banner tap" data-act="opentrim" data-d="${cur}" data-i="${i}">${IC.warn}<div><b>${esc(t.label)} ${fmt(t.from[0])}–${fmt(t.from[1])}</b>${josa(t.label, '이', '가')} ${esc(w)}${josa(w, '과', '와')} ${t.to ? '일부' : '완전히'} 겹칩니다 <span style="color:var(--tint);white-space:nowrap">자세히 보기 ›</span></div></div>`; });
-  const rm = cur >= today() ? restMent(R, isToday) : '';
+  const rm = cur >= liveDay() ? restMent(R, live) : '';
   h += rm;
-  if (cur >= today()){ const I = fitInfo(cur);
+  if (cur >= liveDay()){ const I = fitInfo(cur);
     if (I.ov) h += `<div class="banner tap" data-act="openfit" data-d="${cur}">${IC.warn}<div>할 일이 공부 칸보다 <b>${durShort(I.ov)}</b> 넘칩니다 <span style="color:var(--tint)">시간 맞추기 ›</span></div></div>`;
     else if (I.longest >= 300 && !I.meals.length && I.left.length) h += `<div class="banner info tap" data-act="openfit" data-d="${cur}">${IC.info}<div>집에서 오래 공부하는데 밥 시간이 없습니다 <span style="color:var(--tint)">넣기 ›</span></div></div>`; }
-  h += `<div class="dcols"><div class="dc-a"><div class="sec"><div class="sh"><span>시간표</span><span class="tot">공부 칸 <b>${durTxt(R.studyMin)}</b></span></div>${dayCalHTML(R, cur, isToday)}<div class="sf">${DESK ? '칸을 누르면 이 날만 바꿀 수 있습니다. 할 일은 꾹 눌러서 다른 칸으로 옮깁니다. ← → 키로 날짜를 넘깁니다.' : '칸을 누르면 이 날만 바꿀 수 있습니다. 할 일은 꾹 눌러서 다른 칸으로 옮길 수 있고, 오른쪽 위 동그라미는 그 계획을 했는지 체크하는 곳입니다.'}</div></div></div><div class="dc-b">`;
+  h += `<div class="dcols"><div class="dc-a"><div class="sec"><div class="sh"><span>시간표</span><span class="tot">공부 칸 <b>${durTxt(R.studyMin)}</b></span></div>${dayCalHTML(R, cur, live)}<div class="sf">${DESK ? '칸을 누르면 이 날만 바꿀 수 있습니다. 할 일은 꾹 눌러서 다른 칸으로 옮깁니다. ← → 키로 날짜를 넘깁니다.' : '칸을 누르면 이 날만 바꿀 수 있습니다. 할 일은 꾹 눌러서 다른 칸으로 옮길 수 있고, 오른쪽 위 동그라미는 그 계획을 했는지 체크하는 곳입니다.'}</div></div></div><div class="dc-b">`;
   { const ws = weekStartOf(cur), W = WEEKDOC[ws] || {}, rest = (W.tasks || []);
     if (rest.length) h += grp('이번 주에 아직 안 넣은 할 일', rest.map(x => `<div class="rw"><div class="mid"><div class="tt">${esc(x.text)} <span class="tmin">${durShort(x.min)}</span></div><div class="st">${shortDate(x.due)}까지</div></div><button class="tmb" data-act="wkToDay" data-id="${x.id}" data-ws="${ws}">오늘 하기</button></div>`).join('')); }
   h += taskRows(cur, list, od);
-  if (cur >= today() && breakStretches(R).length) h += `<button class="brklink" data-act="openbreaks" data-d="${cur}">☕ 쉬는 시간 추천 받기 <span>쉬지 않고 이어지는 공부 ${breakStretches(R).length}구간</span></button>`;
+  if (cur >= liveDay() && breakStretches(R).length) h += `<button class="brklink" data-act="openbreaks" data-d="${cur}">☕ 쉬는 시간 추천 받기 <span>쉬지 않고 이어지는 공부 ${breakStretches(R).length}구간</span></button>`;
   h += `</div></div>`;
   h += footer();
   return h;
@@ -2303,7 +2304,7 @@ function weekGridHTML(ws){
       if (r2 <= r1) continue;
       const act = blkAct(b, x.d);
       const sub = '';
-      const isNow = x.d === td && nowMin() >= b.s && nowMin() < b.e;
+      const isNow = x.d === liveDay() && nowMin() >= b.s && nowMin() < b.e;
       const muted = b.type === 'school' || b.type === 'wake' || b.type === 'travel';
       const tl = x.T[b.key] || [], ov = tl.some(it => it.over);
       const isSch = b.type === 'school';
@@ -2312,12 +2313,12 @@ function weekGridHTML(ws){
       for (const it of tl){
         if (it.out) continue;
         const a1 = Math.round((it.s - W.lo) / 10) + 2; let a2 = Math.round((Math.min(it.e, b.e) - W.lo) / 10) + 2; if (a2 <= a1) a2 = a1 + 1;
-        const tnow = x.d === td && nowMin() >= it.s && nowMin() < it.e;
+        const tnow = x.d === liveDay() && nowMin() >= it.s && nowMin() < it.e;
         const rows = a2 - a1, showT = rows >= 6, lines = Math.max(1, Math.floor((rows * 5 - 2 - (showT ? 9 : 0)) / 11.7));
         h += `<div class="wtk ${it.t.done ? 'dn' : ''} ${tnow ? 'cur' : ''} ${lines === 1 ? 'one' : ''}" data-act="open" data-d="${x.d}" style="--c:${c};--l:${lines};grid-column:${i+2};grid-row:${a1} / ${a2}">${showT ? `<em>${fmt(it.s)}</em>` : ''}<span>${esc(wkTaskName(it.t))}</span></div>`;
       }
     }
-    if (x.d === td){ const nm = nowMin(); if (nm >= W.lo && nm <= W.hi){ const y = (nm - W.lo) / 10; h += `<div class="nowg" style="grid-column:${i+2};grid-row:2 / ${W.n + 2};--y:${y}"></div>`; } }
+    if (x.d === liveDay()){ const nm = nowMin(); if (nm >= W.lo && nm <= W.hi){ const y = (nm - W.lo) / 10; h += `<div class="nowg" style="grid-column:${i+2};grid-row:2 / ${W.n + 2};--y:${y}"></div>`; } }
     const rs = Math.round((x.R.sleep - W.lo) / 10) + 2;
     if (rs <= W.n + 1) h += `<div class="sl" style="grid-column:${i+2};grid-row:${rs}"></div>`;
   });
@@ -2744,7 +2745,7 @@ function trimSheetHTML(st){
 /* 시간 맞추기: 넘치는 날 밥·쉬는 시간 넣고, 할 일 시간 줄이거나 옮기기 */
 function fitInfo(date){
   const D = getDay(date), R = buildDay(S, date, D), B = simplifyBlocks(R.blocks, { rests:true }), P = planFor(date, B), F = dayFlow(date, B, P);
-  const from = date === today() ? nowMin() : 0;
+  const from = date === liveDay() ? nowMin() : 0;
   const cap = P.cand.filter(b => b.type !== 'travel' && b.type !== 'school' && b.e > from).reduce((a, b) => a + b.e - Math.max(b.s, from), 0);
   const left = P.tasks.filter(t => !t.done), need = left.filter(t => P.map[t.tk] !== 'seg:학교 수업').reduce((a, t) => a + t.min, 0);
   const meals = (D.extra || []).filter(x => x.kind === 'meal').concat((D.todos || []).filter(x => x.cat === 'meal')), rests = (D.extra || []).filter(x => x.kind === 'rest');
@@ -2767,7 +2768,7 @@ function placeInBlock(date, tk, b, sM, min, pre){
 function placeMeal(date, name, min, want){
   const B = simplifyBlocks(buildDay(S, date, getDay(date)).blocks, { rests:true }), P = planFor(date, B), F = dayFlow(date, B, P);
   const pool = P.cand.filter(b => STUDYT.includes(b.type) && !/^seg:/.test(b.key || ''));
-  const target = want != null ? want : 1110, from = date === today() ? nowMin() : 0;
+  const target = want != null ? want : 1110, from = date === liveDay() ? nowMin() : 0;
   const open = pool.filter(b => b.e > from);
   const hb = (open.length ? open : pool).slice().sort((a, b) => dist(a, target) - dist(b, target))[0];
   function dist(b, m){ return m < b.s ? b.s - m : m > b.e ? m - b.e : 0; }
@@ -2871,7 +2872,7 @@ function whenSheetHTML(st){
     const pills = [0,1,2,3,4,5,6,7].map(i => { const d = addDays(st.date, i); return `<button class="dp ${selD === d ? 'on' : ''}" data-act="whenday" data-v="${d}"><small>${i === 0 ? '그날' : i === 1 ? '다음날' : DAYS[dowOf(d)]}</small><b>${parseYmd(d).getDate()}</b></button>`; }).join('');
     b += `<div class="sec"><div class="sh"><span>날짜</span><input type="date" class="dsel" data-act="whendate" value="${selD}"></div><div class="dps scroll">${pills}</div></div>`;
   } else b += `<div class="sf" style="padding:0 16px 10px">매일 숙제는 그날 안에서만 옮길 수 있습니다.</div>`;
-  const nm = selD === today() ? nowMin() : 0;
+  const nm = selD === liveDay() ? nowMin() : 0;
   if (st.dur == null) st.dur = t.min;
   const DOPT = [[30,'30분'],[60,'1시간'],[90,'1시간 30분'],[120,'2시간'],['full','칸 내내']];
   b += grp('얼마나 할까요?', `<div class="rw"><div class="mid"><div class="durpills">${DOPT.map(([v, l]) => `<button class="${String(st.dur) === String(v) ? 'on' : ''}" data-act="whendur" data-v="${v}">${l}</button>`).join('')}</div></div></div>`
@@ -3716,7 +3717,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 /* ===== 마감: 칸마다 얼마나 했는지 + 못 한 것 넘기기 ===== */
 function viewClose(){
-  const d = studyDay(), blocks = planBlocks(d), nm = d === today() ? nowMin() : 99999;
+  const d = studyDay(), blocks = planBlocks(d), nm = d === liveDay() ? nowMin() : 99999;
   let plan = 0, got = 0, rec = 0;
   for (const b of blocks){ const m = b.e - b.s, v = doneOf(d, b.key); plan += m; if (v === 1){ got += m; rec++; } }
   const pct = plan ? Math.round(got / plan * 100) : 0;
@@ -3879,14 +3880,14 @@ function wkSuggest(){
     blocksBy[d] = P.cand.filter(b => b.type !== 'travel' && b.type !== 'school');
     for (const b of blocksBy[d]) cap[d + '|' + b.key] = b.e - b.s;
     for (const t of P.tasks) if (P.map[t.tk]) cap[d + '|' + P.map[t.tk]] -= t.min;
-    const from = d === today() ? nowMin() : 0;
+    const from = d === liveDay() ? nowMin() : 0;
     for (const t of P.tasks) if (!t.done && !P.map[t.tk]) items.push({ id:d + '|' + t.tk, date:d, tk:t.tk, text:t.text, min:t.min, kind:t.kind, vocab:t.vocab, fixedDay:true, from });
   }
   for (const x of ((WEEKDOC[ws] || {}).tasks || [])) items.push({ id:'w|' + x.id, wid:x.id, text:x.text, min:x.min, due:x.due, cat:x.cat, kind:x.cat === 'my' ? 'my' : 'todo', fixedDay:false });
   const res = {};
   const place = (it, d, key) => { res[it.id] = { date:d, key }; cap[d + '|' + key] -= it.min; };
   for (const it of items){ const o = wkPlan.over[it.id]; if (o === 'none') res[it.id] = null; else if (o) place(it, o.date, o.key); }
-  const fit = (d, it) => { const from = d === today() ? nowMin() : 0; let pool = (blocksBy[d] || []).filter(b => b.e > from + 10); if (it.vocab){ const m = pool.filter(b => b.type === 'memo'); pool = m.concat(pool); } return pool.find(b => cap[d + '|' + b.key] >= it.min) || null; };
+  const fit = (d, it) => { const from = d === liveDay() ? nowMin() : 0; let pool = (blocksBy[d] || []).filter(b => b.e > from + 10); if (it.vocab){ const m = pool.filter(b => b.type === 'memo'); pool = m.concat(pool); } return pool.find(b => cap[d + '|' + b.key] >= it.min) || null; };
   for (const it of items.filter(x => x.fixedDay && !(x.id in res))){ const b = fit(it.date, it); res[it.id] = b ? { date:it.date, key:b.key } : null; if (b) cap[it.date + '|' + b.key] -= it.min; }
   const wk = items.filter(x => !x.fixedDay && !(x.id in res)).sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : b.min - a.min);
   for (const it of wk){ let done = false; for (const d of days){ if (d > it.due) break; const b = fit(d, it); if (b){ place(it, d, b.key); done = true; break; } } if (!done) res[it.id] = null; }
