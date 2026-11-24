@@ -866,6 +866,10 @@ body.dragmode .dev.dropover{box-shadow:inset 0 0 0 1.5px var(--c)!important;back
 .msr-b{flex:none;border:0;background:var(--fill);color:var(--tint);font-size:12.5px;font-weight:600;border-radius:999px;padding:5px 11px}
 .msr-b.on{background:var(--tint);color:#fff}
 html.desk .msr-a:hover{background:color-mix(in srgb,var(--fill) 60%,transparent)}
+.jbrow{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 12px}
+.jbchip{border:0;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--text);font-size:12.5px;padding:5px 10px;border-radius:999px;font-variant-numeric:tabular-nums}
+.jbchip b{color:var(--c);font-weight:700;margin-right:2px}
+.jbadd{border:0;background:none;color:var(--tint);font-size:12.5px;font-weight:600;padding:5px 4px}
 /* ===== 컴퓨터 화면 (html.desk) ===== */
 html.desk body{padding-left:228px}
 html.desk .wrap{padding:22px 32px 48px}
@@ -1259,7 +1263,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "3f0e779b67a6";
+const BUILD = "4d747a19242f";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1547,6 +1551,7 @@ function ensureDays(){
   for (let i = -7; i < 14; i++) want.add(addDays(weekStart, i));   /* 앞뒤 주도 미리 받아 두면 주를 넘길 때 덜컥거리지 않는다 */
   for (let i = -1; i <= 1; i++){ want.add(addDays(cur, i)); want.add(addDays(selDate, i)); want.add(addDays(today(), i)); }
   const ws2 = weekStartOf(selDate); for (let i = 0; i < 7; i++) want.add(addDays(ws2, i));
+  if (typeof EX !== 'undefined' && EX && EX.subjects) for (const s of EX.subjects) if (s.date >= today()) for (let i = 1; i <= 7; i++) want.add(addDays(s.date, -i));   /* 시험 전 직보 */
   for (const d of want){
     const p = 'days/' + d;
     if (!subs[p]) sub(p, data => { if (running[p] || pend[p]) return; DAYDOC[d] = data ? clone(data) : {}; render(); });
@@ -2294,7 +2299,7 @@ function viewHW(){
 /* ===== 시트 ===== */
 function openSheet(s){ sheet = s; render(); }
 /* 창 위 '저장': 고른 것을 적용하고 닫는다 (위에 겹친 창이면 아래 창으로 돌아간다) */
-const FORM_SAVE = { add:'addsave', flex:'fxsave', hw:'hfadd', breaks:'brkadd' };
+const FORM_SAVE = { add:'addsave', flex:'fxsave', hw:'hfadd', breaks:'brkadd', jikbo:'exjbsave' };
 function fireAct(act, data){ const b = document.createElement('button'); b.dataset.act = act; Object.assign(b.dataset, data || {}); b.hidden = true; document.body.appendChild(b); b.click(); b.remove(); }
 function sheetSave(){
   const ae = document.activeElement; if (ae && ae.blur && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) ae.blur();
@@ -2356,6 +2361,7 @@ function renderSheet(){
   else if (sheet.type === 'fit'){ title = shortDate(sheet.date) + ' 시간 맞추기'; body = fitSheetHTML(sheet); }
   else if (sheet.type === 'myweek'){ title = sheet.mode === 'default' ? '내 공부 기본 목록' : '이번 주 내 공부'; body = myWeekSheetHTML(sheet); }
   else if (sheet.type === 'when'){ const r = whenSheetHTML(sheet); title = r.title; body = r.body; }
+  else if (sheet.type === 'jikbo'){ title = '학원 직보'; body = jbSheetHTML(sheet); }
   else if (sheet.type === 'add'){ title = shortDate(sheet.date) + ' 추가'; body = addSheetHTML(sheet); }
   else if (sheet.type === 'print'){ title = '인쇄'; body = printSheetHTML(); right = '닫기'; }
   else if (sheet.type === 'pdfready'){ title = 'PDF'; right = '닫기'; body = PDFREADY ? `<div class="sf" style="padding:0 16px 14px;font-size:15px">${esc(PDFREADY.name)}</div>` + grp('', `<button class="rw tap add" data-act="pdfsave"><div class="mid"><div class="tt">PDF 저장</div><div class="st">다운로드 폴더에 저장됩니다</div></div></button>`) : ''; }
@@ -3905,6 +3911,7 @@ function exSorted(){ return (EX ? EX.subjects : []).slice().sort((a, b) => a.dat
 
 function viewExam(){
   if (!EX) EX = defaultExam();
+  if (!viewExam.ens){ viewExam.ens = true; setTimeout(ensureDays, 0); }
   const L = exSorted(), td = today();
   const up = L.filter(s => s.date >= td), past = L.filter(s => s.date < td);
   const U = L.reduce((a, s) => a + exUnits(s), 0), Dn = L.reduce((a, s) => a + exDone(s), 0), pct = U ? Math.round(Dn / U * 100) : 0;
@@ -3917,7 +3924,7 @@ function viewExam(){
     const p = exPct(s), open = exOpen.has(s.id), d = exD(s.date), n = dayDiff(td, s.date);
     let c = `<div class="exc ${open ? 'open' : ''} ${n < 0 ? 'past' : ''}" style="--c:${s.color}">
       <button class="exhd" data-act="exopen" data-id="${s.id}"><div class="exl"><b>${esc(s.name)}</b><small>${shortDate(s.date)} ${s.per} · ${s.time}</small></div><span class="exdd ${n <= 3 && n >= 0 ? 'hot' : ''}">${d}</span></button>
-      <div class="exbar"><i style="width:${p}%"></i></div><div class="exmeta"><span>${exDone(s)} / ${exUnits(s)}</span><span>${p}%</span></div>`;
+      <div class="exbar"><i style="width:${p}%"></i></div><div class="exmeta"><span>${exDone(s)} / ${exUnits(s)}</span><span>${p}%</span></div>${n >= 0 ? jbRow(s) : ''}`;
     if (open){
       let lastWho = null;
       c += `<div class="exitems">`;
@@ -3940,6 +3947,43 @@ function viewExam(){
   h += `<div class="sf" style="text-align:center;margin-top:6px">과목을 누르면 범위가 펼쳐집니다. 숫자 칸은 하나씩 누를 수 있습니다.</div>`;
   return h;
 }
+/* ===== 학원 직보: 시험 보는 과목 전날 학원에서 하는 직전 보강 ===== */
+const jbList = sid => { const out = []; const s = EX.subjects.find(x => x.id === sid); if (!s) return out;
+  for (let i = 1; i <= 10; i++){ const d = addDays(s.date, -i); for (const x of (getDay(d).extra || [])) if (x.jikbo === sid) out.push({ d, x }); }
+  return out.sort((a, b) => a.d < b.d ? -1 : 1); };
+function jbRow(s){
+  const L = jbList(s.id);
+  return `<div class="jbrow">${L.map(({ d, x }) => `<button class="jbchip" data-act="openacad" data-k="x:${x.id}" data-d="${d}"><b>직보</b> ${shortDate(d)} ${x.start}–${x.end}${x.name && !/^직보$/.test(x.name) ? ' · ' + esc(x.name.replace(/\s*직보$/, '')) : ''}</button>`).join('')}<button class="jbadd" data-act="exjbnew" data-s="${s.id}">+ 학원 직보</button></div>`;
+}
+/* 과목 이름으로 학원 짐작: 공통영어2 → 영어 학원 */
+const JBKEY = ['영어','국어','수학','사회','과학','일본어','한국사'];
+function jbAcads(){
+  const m = new Map();
+  for (const a of (S.academies || [])) if (a.name && !m.has(a.name)) m.set(a.name, { name:a.name, place:a.place || 'home', start:a.start, end:a.end });
+  for (const k in DAYDOC) for (const x of (DAYDOC[k].extra || [])) if (x.kind === 'event' && !x.jikbo && /학원|과외/.test(x.name || '') && !m.has(x.name)) m.set(x.name, { name:x.name, place:x.place || 'home', start:x.start, end:x.end });
+  return [...m.values()].filter(a => /학원|과외/.test(a.name));
+}
+function jbGuess(sub){
+  const k = JBKEY.find(w => sub.name.includes(w)), A = jbAcads();
+  const hit = k ? A.filter(a => a.name.includes(k)) : [];
+  return hit.sort((a, b) => (/학원/.test(b.name) ? 1 : 0) - (/학원/.test(a.name) ? 1 : 0))[0] || null;
+}
+function jbSheetHTML(st){
+  const sub = EX.subjects.find(x => x.id === st.sid); if (!sub) return '';
+  const f = st.form || (st.form = (() => { const g = jbGuess(sub); return { date:addDays(sub.date, -1), acad: g ? g.name : '', place: g ? g.place : 'daechi', start: (g && g.start) || '18:00', end: (g && g.end) || '21:00' }; })());
+  let b = `<div class="sf" style="padding:0 16px 14px;font-size:15px">${esc(sub.name)} 시험 ${shortDate(sub.date)} ${sub.per}</div>`;
+  const pills = [7,6,5,4,3,2,1].map(i => { const d = addDays(sub.date, -i); return `<button class="dp ${f.date === d ? 'on' : ''}" data-act="exjbday" data-v="${d}"><small>${i === 1 ? '전날' : DAYS[dowOf(d)]}</small><b>${parseYmd(d).getDate()}</b></button>`; }).join('');
+  b += `<div class="sec"><div class="sh"><span>날짜</span></div><div class="dps scroll">${pills}</div></div>`;
+  const A = jbAcads();
+  b += grp('학원', (A.length ? `<div class="rw"><div class="mid"><div class="durpills">${A.map(a => `<button class="${f.acad === a.name ? 'on' : ''}" data-act="exjbacad" data-v="${esc(a.name)}">${esc(a.name)}</button>`).join('')}</div></div></div>` : '')
+    + `<div class="rw"><div class="mid" style="flex:none"><div class="tt">이름</div></div><input type="text" data-keep="1" id="jb-name" value="${esc(f.acad)}" placeholder="예: 영어 학원"></div>
+    <div class="rw"><div class="mid" style="flex:none"><div class="tt">시간</div></div><span style="flex:1"></span><input type="time" id="jb-s" value="${f.start}"><span class="val">~</span><input type="time" id="jb-e" value="${f.end}"></div>
+    <div class="rw"><div class="mid"><div class="tt">장소</div></div><select id="jb-p">${[['home','집'],['school','학교 앞'],['daechi','대치']].map(([k,l]) => `<option value="${k}" ${f.place===k?'selected':''}>${l}</option>`).join('')}</select></div>`,
+    '그날 시간표에 직보로 들어가고, 장소에 맞춰 이동 시간이 붙습니다.');
+  b += `<button class="btn" data-act="exjbsave">${shortDate(f.date)} 직보 넣기</button>`;
+  return b;
+}
+function jbRead(){ const f = sheet && sheet.form; if (!f) return; const g = id => document.getElementById(id); if (g('jb-name')) f.acad = g('jb-name').value; if (g('jb-s')) f.start = g('jb-s').value; if (g('jb-e')) f.end = g('jb-e').value; if (g('jb-p')) f.place = g('jb-p').value; }
 function exFind(sid, iid){ const s = EX.subjects.find(x => x.id === sid); return { s, x: s && s.items.find(y => y.id === iid) }; }
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t || !EX) return;
@@ -3950,6 +3994,14 @@ document.addEventListener('click', e => {
     case 'expt': { const { x } = exFind(t.dataset.s, t.dataset.i), k = +t.dataset.k; if (!x) return; x.done = x.done || []; x.done = x.done.includes(k) ? x.done.filter(y => y !== k) : x.done.concat(k).sort((p, q) => p - q); saveEX(); return; }
     case 'exall': { const { x } = exFind(t.dataset.s, t.dataset.i); if (!x) return; x.done = (x.done || []).length === x.parts.length ? [] : x.parts.map((_, k) => k); saveEX(); return; }
     case 'exedit': exEdit = exEdit === t.dataset.id ? null : t.dataset.id; render(); return;
+    case 'exjbnew': openSheet({ type:'jikbo', sid:t.dataset.s }); return;
+    case 'exjbday': jbRead(); sheet.form.date = t.dataset.v; render(); return;
+    case 'exjbacad': { jbRead(); const a = jbAcads().find(x => x.name === t.dataset.v); if (a){ sheet.form.acad = a.name; sheet.form.place = a.place; if (a.start && a.end){ sheet.form.start = a.start; sheet.form.end = a.end; } } render(); return; }
+    case 'exjbsave': { jbRead(); const f = sheet.form, sub = EX.subjects.find(x => x.id === sheet.sid);
+      if (!f.start || !f.end || clockMinUI(f.end) <= clockMinUI(f.start)){ toast('시간을 확인해 주세요'); return; }
+      const nm = (f.acad || '').trim(), name = (nm ? nm + ' ' : (sub ? sub.name + ' ' : '')) + '직보';
+      setDay(f.date, D => { D.extra = D.extra || []; D.extra.push({ id:exId(), name, start:f.start, end:f.end, place:f.place, travel:0, kind:'event', jikbo:sheet.sid }); });
+      toast(shortDate(f.date) + ' ' + name + ' 넣었습니다'); sheet = null; render(); return; }
     case 'exdel': { const { s } = exFind(t.dataset.s, t.dataset.i); if (s){ s.items = s.items.filter(y => y.id !== t.dataset.i); saveEX(); } return; }
   }
 });
