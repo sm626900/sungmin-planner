@@ -1235,7 +1235,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "5bf51cad484e";
+const BUILD = "4ca789caa0df";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1333,26 +1333,19 @@ async function cloudDb(){
 
 /* ===== 파일 받기 ===== */
 const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-/* Mac Safari에서 'Dock에 추가'한 웹 앱: 파일 다운로드가 막혀 있어 인쇄 창(PDF로 저장)을 쓴다 */
-const macWebApp = () => !isIOS() && /Mac/.test(navigator.platform) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent)
-  && ((window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true);
-function printImages(urls, size, orient){
-  return new Promise(res => {
-    const box = document.createElement('div'); box.id = 'printimgs';
-    const pg = (size === 'A5' ? 'A5' : 'A4') + ' ' + (orient === 'landscape' ? 'landscape' : 'portrait');
-    box.innerHTML = `<style>#printimgs{display:none}@page{size:${pg};margin:0}@media print{html,body{background:#fff!important;padding:0!important;margin:0!important}body>*:not(#printimgs){display:none!important}#printimgs{display:block!important}#printimgs img{display:block;width:100%;height:100vh;object-fit:contain;break-after:page;page-break-after:always}#printimgs img:last-child{break-after:auto;page-break-after:auto}}</style>` + urls.map(u => `<img src="${u}">`).join('');
-    document.body.appendChild(box);
-    const done = () => { window.removeEventListener('afterprint', done); setTimeout(() => box.remove(), 300); res(); };
-    Promise.all([...box.querySelectorAll('img')].map(i => i.decode ? i.decode().catch(() => {}) : null)).then(() => {
-      window.addEventListener('afterprint', done);
-      setTimeout(() => { window.print(); if (!('onafterprint' in window)) done(); }, 50);
-    });
-  });
+/* Mac Safari에서 'Dock에 추가'한 웹 앱: 오래 걸린 작업 뒤의 자동 다운로드가 막히므로, 다 만든 뒤 사용자가 직접 누르는 버튼으로 받는다 */
+const macWebApp = () => !isIOS() && /Mac/.test(navigator.platform) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent);
+/* 버튼을 누른 그 순간에 바로 받기 (await 없이) */
+function downloadNow(filename, blob){
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
 }
 async function saveFile(filename, blob){
   if (dl) return dl.save({ filename, data:blob });
   const iOS = isIOS();
-  if ((iOS || macWebApp()) && navigator.canShare){
+  if (iOS && navigator.canShare){
     const file = new File([blob], filename, { type:blob.type });
     if (navigator.canShare({ files:[file] })){
       try { await navigator.share({ files:[file] }); return; }
@@ -2294,6 +2287,7 @@ function renderSheet(){
   else if (sheet.type === 'when'){ const r = whenSheetHTML(sheet); title = r.title; body = r.body; }
   else if (sheet.type === 'add'){ title = shortDate(sheet.date) + ' 추가'; body = addSheetHTML(sheet); }
   else if (sheet.type === 'print'){ title = '인쇄'; body = printSheetHTML(); right = '닫기'; }
+  else if (sheet.type === 'pdfready'){ title = 'PDF'; right = '닫기'; body = PDFREADY ? `<div class="sf" style="padding:0 16px 14px;font-size:15px">${esc(PDFREADY.name)}</div>` + grp('', `<button class="rw tap add" data-act="pdfsave"><div class="mid"><div class="tt">PDF 저장</div><div class="st">다운로드 폴더에 저장됩니다</div></div></button>`) : ''; }
   const key = sheet.type + (sheet.key || '') + (sheet.date || '') + (sheet.fid || '') + (sheet.isNew ? 'n' : '') + (sheet.s != null ? 's' + sheet.s : '');
   morph($('#shd'), `<button></button><b>${esc(title)}</b><button class="r" data-act="sheetclose">${right}</button>`);
   const sb = $('#sbody');
@@ -2829,6 +2823,7 @@ document.addEventListener('click', e => {
       HW.items.push({ id:uid(), subj:f.subj, title:f.title.trim(), unit:'', start, due:f.due, created:new Date().toISOString(), parts:dates.map((x,i) => { const r = ((f.ranges || [])[i] || '').trim(); return r ? { i, date:x, done:false, label:r } : { i, date:x, done:false }; }) });
       sheet = null; saveHW(); toast(f.n + '번으로 나눴습니다'); return; }
     case 'printsheet': openSheet({ type:'print' }); return;
+    case 'pdfsave': if (PDFREADY){ downloadNow(PDFREADY.name, PDFREADY.blob); toast(PDFREADY.size + ' PDF를 저장했습니다'); PDFREADY = null; sheet = null; render(); } return;
     case 'openmyweek': openSheet({ type:'myweek', ws:t.dataset.ws, mode:'week' }); return;
     case 'openmydef': openSheet({ type:'myweek', mode:'default', ws:weekStartOf(cur), prev:sheet }); return;
     case 'mymin': myListEdit(L => { const x = L.find(y => y.id === t.dataset.id); if (x) x.min = Math.max(0, (+x.min || 0) + +t.dataset.n) || null; }); return;
@@ -4109,6 +4104,7 @@ function paginate(root){
 }
 /* ===== PDF 만들기 ===== */
 function loadScript(src){ return new Promise((res, rej) => { if (document.querySelector(`script[src="${src}"]`)) return res(); const sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = () => rej(new Error('load')); document.head.appendChild(sc); }); }
+let PDFREADY = null;
 async function doPrint(size, orient){
   orient = orient || 'portrait';
   toast('PDF 만드는 중…');
@@ -4131,21 +4127,15 @@ async function doPrint(size, orient){
     const { jsPDF } = window.jspdf;
     let dim = size === 'A5' ? [148, 210] : [210, 297]; if (orient === 'landscape') dim = [dim[1], dim[0]];
     const pdf = new jsPDF({ unit:'mm', format:size.toLowerCase(), orientation:orient, compress:true });
-    const pages = root.querySelectorAll('.pq-page'), mac = macWebApp(), imgs = [];
+    const pages = root.querySelectorAll('.pq-page');
     for (let i = 0; i < pages.length; i++){
       const canvas = await window.html2canvas(pages[i], { scale: size === 'A5' ? 5.4 : 4, backgroundColor:'#ffffff', logging:false, useCORS:true });
-      const url = canvas.toDataURL('image/png');
-      if (mac){ imgs.push(url); continue; }
       if (i) pdf.addPage(size.toLowerCase(), orient);
-      pdf.addImage(url, 'PNG', 0, 0, dim[0], dim[1], undefined, 'FAST');
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, dim[0], dim[1], undefined, 'FAST');
     }
-    if (mac){
-      root.remove(); sheet = null; render();
-      toast('인쇄 창 왼쪽 아래 PDF ▾ → PDF로 저장');
-      await printImages(imgs, size, orient); return;
-    }
-    const blob = pdf.output('blob');
-    await saveFile('주간일정표_' + weekStart + '_' + size + (orient === 'landscape' ? '_가로' : '') + '.pdf', blob);
+    const blob = pdf.output('blob'), name = '주간일정표_' + weekStart + '_' + size + (orient === 'landscape' ? '_가로' : '') + '.pdf';
+    if (macWebApp()){ PDFREADY = { name, blob, size }; openSheet({ type:'pdfready' }); return; }
+    await saveFile(name, blob);
     toast(size + ' PDF를 받았습니다'); sheet = null; render();
   } catch(e){ if (!(e && e.code === 'declined')) toast('PDF 만들기 실패 (' + (e && (e.code || e.message) || '오류') + ')'); }
   finally { root.remove(); }
