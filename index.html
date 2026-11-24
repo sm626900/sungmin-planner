@@ -842,6 +842,7 @@ body{-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
 .dcal .dev.past:hover{opacity:.7}
 .dcal .tk.slot.past{opacity:.45}
 .dcal .tk.slot.past.on{opacity:.6}
+.dcal .tk.slot.meal{--c:var(--brown);background:color-mix(in srgb,var(--brown) 14%,var(--card))}
 /* ===== 컴퓨터 화면 (html.desk) ===== */
 html.desk body{padding-left:228px}
 html.desk .wrap{padding:22px 32px 48px}
@@ -1235,7 +1236,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "4ca789caa0df";
+const BUILD = "3eb837171649";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1575,7 +1576,7 @@ function checklist(date){
   for (const r of weekMy(weekStartOf(date))) if (!(D.skipMy || {})[r.id] && (!Array.isArray(r.days) || r.days.includes(dow))) items.push({ kind:'myr', id:r.id, key:'r:' + r.id, text:r.text, min:r.min, done:!!ck['r:' + r.id] });
   for (const h of HW.items) for (const p of h.parts) if (p.date === date)
     items.push({ kind:'hw', due:h.due, min:p.min, hid:h.id, pi:p.i, text:h.subj + ' · ' + h.title + (p.label ? ' ' + p.label : ''), sub:p.label ? (p.i+1) + '/' + h.parts.length : (p.i+1) + '/' + h.parts.length + ' · 마감 ' + shortDate(h.due), done:!!p.done });
-  for (const td of (D.todos||[])) items.push({ kind: td.cat === 'my' ? 'my' : 'todo', id:td.id, text:td.text + (td.part ? ' · ' + td.part : ''), base:td.text, part:td.part || '', done:!!td.done, min:td.min, due:td.due });
+  for (const td of (D.todos||[])) items.push({ kind: td.cat === 'my' ? 'my' : td.cat === 'meal' ? 'meal' : 'todo', id:td.id, text:td.text + (td.part ? ' · ' + td.part : ''), base:td.text, part:td.part || '', done:!!td.done, min:td.min, due:td.due });
   return items;
 }
 const units = list => list.reduce((a, x) => a + (x.parts ? x.parts.length : 1), 0);
@@ -1623,6 +1624,7 @@ function dayTasks(date){
     else if (x.kind === 'hw') out.push({ tk:'h:' + x.hid + ':' + x.pi, text:x.text, done:x.done, act:'hwdone', attrs:`data-h="${x.hid}" data-p="${x.pi}"`, kind:'hw', min0:x.min || 30, due:x.due, hid:x.hid, pi:x.pi });
     else if (x.kind === 'todo') out.push({ tk:'t:' + x.id, text:x.text, base:x.base, part:x.part, done:x.done, act:'todo', attrs:`data-id="${x.id}"`, kind:'todo', min0:x.min || 30, due:x.due || date, id:x.id });
     else if (x.kind === 'myr') out.push({ tk:x.key, text:x.text, done:x.done, act:'ckp', attrs:`data-k="${x.key}"`, kind:'my', min0:x.min || 30, due:date, rid:x.id });
+    else if (x.kind === 'meal') out.push({ tk:'t:' + x.id, text:'🍚 ' + x.text, base:x.base, done:x.done, act:'todo', attrs:`data-id="${x.id}"`, kind:'meal', min0:x.min || 60, due:date, id:x.id });
     else if (x.kind === 'my') out.push({ tk:'t:' + x.id, text:x.text, done:x.done, act:'todo', attrs:`data-id="${x.id}"`, kind:'my', min0:x.min || 30, due:x.due || date, id:x.id });
   }
   const mins = getDay(date).mins || {}, tn = getDay(date).tname || {};
@@ -2051,7 +2053,7 @@ let planStep = null, planStepDate = null;
 function viewToday(){
   const D = getDay(cur), R = buildDay(S, cur, D), isToday = cur === today();
 
-  const list = checklist(cur), od = isToday ? overdue(cur) : [];
+  const list = checklist(cur).filter(x => x.kind !== 'meal'), od = isToday ? overdue(cur) : [];
   const total = units(list) + od.length, done = unitsDone(list);
   const blocksS = simplifyBlocks(R.blocks).filter(b => STUDYT.includes(b.type)), bdone = blocksS.filter(b => doneOf(cur, b.key) === 1).length;
   let h = navBar(navIcons());
@@ -2345,7 +2347,7 @@ function taskSheetHTML(st){
       + `<div class="rw"><div class="mid"><div class="tt">이동</div><div class="st">${fmt(e0)}부터</div></div><div class="durpills">${[10, 30, 60].map(n => `<button data-act="tafter" data-v="travel|${n}" data-d="${st.date}" data-s="${e0}">${durShort(n)}</button>`).join('')}</div></div>`, '넣으면 뒤에 있는 할 일이 그만큼 뒤로 밀립니다. 넣은 칸을 누르면 시간을 바꾸거나 지울 수 있습니다.'); }
   const delL = st.tk.startsWith('t:') ? '삭제' : st.tk.startsWith('h:') ? '이 날 몫 삭제' : '이 날은 안 함';
   b += grp('', `<button class="rw tap danger" data-act="tdel" ${tA}><div class="mid"><div class="tt">${delL}</div></div></button>`);
-  return { title:'할 일', body:b };
+  return { title: x.kind === 'meal' ? '식사' : '할 일', body:b };
 }
 function yajaPick(date, R, dA){
   const opts = [['after1','야자1까지'],['dinner','석식까지'],['after2','야자2까지'],['full','야자3까지 (끝까지)'],['none','야자 안 함']];
@@ -2448,7 +2450,7 @@ function fitInfo(date){
   const from = date === today() ? nowMin() : 0;
   const cap = P.cand.filter(b => b.type !== 'travel' && b.type !== 'school' && b.e > from).reduce((a, b) => a + b.e - Math.max(b.s, from), 0);
   const left = P.tasks.filter(t => !t.done), need = left.filter(t => P.map[t.tk] !== 'seg:학교 수업').reduce((a, t) => a + t.min, 0);
-  const meals = (D.extra || []).filter(x => x.kind === 'meal'), rests = (D.extra || []).filter(x => x.kind === 'rest');
+  const meals = (D.extra || []).filter(x => x.kind === 'meal').concat((D.todos || []).filter(x => x.cat === 'meal')), rests = (D.extra || []).filter(x => x.kind === 'rest');
   const home = P.cand.filter(b => b.type !== 'travel' && b.type !== 'school' && !/^seg:/.test(b.key || ''));
   const longest = home.reduce((a, b) => Math.max(a, b.e - b.s), 0);
   return { D, R, B, P, F, ov:dayOver(F), cap, need, left, meals, rests, home, longest };
@@ -2464,11 +2466,25 @@ function placeInBlock(date, tk, b, sM, min, pre){
   const order = items.map(it => it.t.tk); let at = items.findIndex(it => it.s >= sM); if (at < 0) at = order.length; order.splice(at, 0, tk);
   setDay(date, D => { if (pre) pre(D); D.plan = D.plan || {}; D.plan[tk] = b.key; D.mins = D.mins || {}; D.mins[tk] = min; D.at = D.at || {}; if (sM > b.s) D.at[tk] = sM; else delete D.at[tk]; D.ord = D.ord || {}; order.forEach((x, i) => { D.ord[x] = i; }); });
 }
+/* 시간 안 정한 식사: 공부 칸의 할 일 사이에 끼운다. 기본은 저녁 무렵(18:30)에 가장 가까운 자리 */
+function placeMeal(date, name, min, want){
+  const B = simplifyBlocks(buildDay(S, date, getDay(date)).blocks, { rests:true }), P = planFor(date, B), F = dayFlow(date, B, P);
+  const pool = P.cand.filter(b => STUDYT.includes(b.type) && !/^seg:/.test(b.key || ''));
+  const target = want != null ? want : 1110, from = date === today() ? nowMin() : 0;
+  const open = pool.filter(b => b.e > from);
+  const hb = (open.length ? open : pool).slice().sort((a, b) => dist(a, target) - dist(b, target))[0];
+  function dist(b, m){ return m < b.s ? b.s - m : m > b.e ? m - b.e : 0; }
+  if (!hb) return null;
+  const id = uid(), tk = 't:' + id, items = (F[hb.key] || []).filter(it => !it.cont);
+  const order = items.map(it => it.t.tk); let at = items.findIndex(it => it.s >= Math.max(target, from)); if (at < 0) at = order.length; order.splice(at, 0, tk);
+  setDay(date, D => { D.todos = D.todos || []; D.todos.push({ id, text:name, done:false, cat:'meal', min }); D.plan = D.plan || {}; D.plan[tk] = hb.key; D.mins = D.mins || {}; D.mins[tk] = min; D.ord = D.ord || {}; order.forEach((x, i) => { D.ord[x] = i; }); });
+  return hb;
+}
 function fitAuto(d){
   const base = clone(getDay(d)); let any = false;
   for (let it = 0; it < 10; it++){
     const I = fitInfo(d); if (!I.ov) break;
-    const L = I.left.filter(x => x.kind !== 'daily').map(x => ({ x, floor:Math.max(10, Math.ceil(((x.min0 || 30) * .6) / 10) * 10) })).filter(o => o.x.min - o.floor >= 10);
+    const L = I.left.filter(x => x.kind !== 'daily' && x.kind !== 'meal').map(x => ({ x, floor:Math.max(10, Math.ceil(((x.min0 || 30) * .6) / 10) * 10) })).filter(o => o.x.min - o.floor >= 10);
     if (!L.length) break;
     const red = {}; for (const o of L) red[o.x.tk] = o.x.min;
     let cut = 0;
@@ -2580,10 +2596,14 @@ function addSheetHTML(st){
   const ph = { meal:'저녁', rest:'쉬기', study:'수학 오답 정리', travel:'차로 이동', event:'국어 재시 · 약속' }[f.kind];
   let b = `<div class="sf" style="padding:0 16px 14px;font-size:15px">${shortDate(st.date)}에만 들어갑니다. 겹치는 공부 칸은 그만큼 줄어듭니다.</div>`;
   b += `<div class="segwrap">${seg([['meal','식사'],['rest','쉬기'],['study','공부'],['travel','이동'],['event','일정·학원']], f.kind, 'addkind')}</div>`;
-  b += grp('', `<div class="rw"><div class="mid"><div class="tt">이름</div></div><input type="text" data-keep="1" id="ad-name" value="${esc(f.name)}" placeholder="${ph}"></div>
-    <div class="rw"><div class="mid" style="flex:none"><div class="tt">시간</div></div><span style="flex:1"></span><input type="time" id="ad-s" value="${f.start}"><span class="val">~</span><input type="time" id="ad-e" value="${f.end}"></div>`
+  const flt = f.kind === 'meal' && f.mode === 'flex';
+  if (f.kind === 'meal') b += `<div class="segwrap">${seg([['fixed','시간 정하기'],['flex','할 일 사이에 넣기']], f.mode || 'fixed', 'addmode')}</div>`;
+  b += grp('', `<div class="rw"><div class="mid"><div class="tt">이름</div></div><input type="text" data-keep="1" id="ad-name" value="${esc(f.name)}" placeholder="${ph}"></div>`
+    + (flt ? `<div class="rw"><div class="mid"><div class="tt">얼마나</div></div><div class="step"><button data-act="addmin" data-n="-10">−</button><span>${durShort(f.min || 60)}</span><button data-act="addmin" data-n="10">+</button></div></div>`
+      : `<div class="rw"><div class="mid" style="flex:none"><div class="tt">시간</div></div><span style="flex:1"></span><input type="time" id="ad-s" value="${f.start}"><span class="val">~</span><input type="time" id="ad-e" value="${f.end}"></div>`)
     + (f.kind === 'study' ? `<div class="rw"><div class="mid">${seg([['hw','숙제'],['my','내 공부'],['memo','암기'],['review','복습']], f.tag, 'addtag')}</div></div>` : '')
     + (f.kind === 'event' ? `<div class="rw"><div class="mid"><div class="tt">장소</div></div><select id="ad-p">${[['home','집'],['school','학교 앞'],['daechi','대치']].map(([k,l]) => `<option value="${k}" ${f.place===k?'selected':''}>${l}</option>`).join('')}</select></div>` : ''));
+  if (flt) b += `<div class="sf" style="padding:0 16px 12px">할 일처럼 공부 칸에 들어갑니다. 꾹 눌러서 다른 할 일 사이로 옮길 수 있습니다.</div>`;
   b += `<button class="btn" data-act="addsave">넣기</button>`;
   return b;
 }
@@ -2989,7 +3009,12 @@ document.addEventListener('click', e => {
     case 'openadd': openSheet({ type:'add', date:d, s: t.dataset.s != null ? +t.dataset.s : null, e: t.dataset.e != null ? +t.dataset.e : null, kind:t.dataset.kind || null, prev:sheet }); return;
     case 'addkind': readAdd(); sheet.form.kind = v; render(); return;
     case 'addtag': readAdd(); sheet.form.tag = v; render(); return;
+    case 'addmode': readAdd(); sheet.form.mode = v; if (!sheet.form.min) sheet.form.min = 60; render(); return;
+    case 'addmin': readAdd(); sheet.form.min = Math.max(10, Math.min(180, (sheet.form.min || 60) + +t.dataset.n)); render(); return;
     case 'addsave': { readAdd(); const f = sheet.form, name = f.name.trim() || ({ meal:'저녁', rest:'쉬기', study:'공부', travel:'이동', event:'일정' })[f.kind];
+      if (f.kind === 'meal' && f.mode === 'flex'){ const dd = sheet.date, r = placeMeal(dd, name, f.min || 60, sheet.s);
+        if (!r){ toast('넣을 공부 칸이 없습니다'); return; }
+        toast(name + ' ' + durShort(f.min || 60) + ' 넣었습니다'); sheet = sheet.prev && (sheet.prev.type === 'day' || sheet.prev.type === 'fit' || sheet.prev.type === 'blk') ? sheet.prev : null; render(); return; }
       if (!f.start || !f.end || clockMinUI(f.end) <= clockMinUI(f.start)){ toast('시간을 확인해 주세요'); return; }
       if (f.kind === 'study'){ const sM = clockMinUI(f.start), eM = clockMinUI(f.end), hb = hostBlock(sheet.date, sM, eM);
         if (hb){ const id = uid(), dd = sheet.date; placeInBlock(dd, 't:' + id, hb, sM, eM - sM, D => { D.todos = D.todos || []; D.todos.push({ id, text:name, done:false, cat:f.tag === 'my' ? 'my' : 'hw', min:eM - sM }); });
@@ -3663,7 +3688,7 @@ function dayCalHTML(R, date, isToday){
         if (p.free){ chips += `<div class="dfree" style="top:${top}px;height:${p.h}px"><span>${fmt(p.s)} · 빈 시간 ${durShort(p.e - p.s)}</span></div>`; continue; }
         const it = p.it, x = it.t, cur = isToday && nm >= it.s && nm < it.e;
         if (it.over) ovMin = Math.max(ovMin, it.e - b.e);
-        chips += `<button class="tk slot ${x.done ? 'on' : ''} ${cur ? 'cur' : ''} ${isToday && !cur && nm >= it.e ? 'past' : ''} ${it.over ? 'ov' : ''} ${it.cont ? 'cont' : ''}" data-act="opentask" data-tk="${esc(x.tk)}" data-from="${k}" data-d="${date}" style="top:${top}px;height:${p.h - 1}px"><span class="st0">${fmt(it.s)}</span><span class="o" data-act="${x.act}" ${x.attrs} data-d="${date}">${IC.check}</span><span class="tx2">${esc(x.text)}${it.cont ? ' <small>이어서</small>' : it.cut ? ' <small>→ 뒤에 이어서</small>' : ''}</span><span class="tmin">${it.out ? '칸 넘침' : durShort(it.cont || it.cut ? it.e - it.s : x.min)}</span></button>`;
+        chips += `<button class="tk slot ${x.kind === 'meal' ? 'meal' : ''} ${x.done ? 'on' : ''} ${cur ? 'cur' : ''} ${isToday && !cur && nm >= it.e ? 'past' : ''} ${it.over ? 'ov' : ''} ${it.cont ? 'cont' : ''}" data-act="opentask" data-tk="${esc(x.tk)}" data-from="${k}" data-d="${date}" style="top:${top}px;height:${p.h - 1}px"><span class="st0">${fmt(it.s)}</span><span class="o" data-act="${x.act}" ${x.attrs} data-d="${date}">${IC.check}</span><span class="tx2">${esc(x.text)}${it.cont ? ' <small>이어서</small>' : it.cut ? ' <small>→ 뒤에 이어서</small>' : ''}</span><span class="tmin">${it.out ? '칸 넘침' : durShort(it.cont || it.cut ? it.e - it.s : x.min)}</span></button>`;
       }
       chips = `<div class="tks slots">${chips}</div>`;
     } else if (s.sch){
