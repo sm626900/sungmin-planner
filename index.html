@@ -1210,6 +1210,7 @@ function cutAround(blocks, O){
   const out = [];
   for (const b of blocks){
     if (b.marker || (PROTECT.includes(b.type) && !(O.custom && autoTr(b))) || b.key === 'seg:학교 수업' || b.e <= O.s || b.s >= O.e){ out.push(b); continue; }
+    if (O.custom && autoTr(b)) continue;   /* 직접 넣은 것과 겹친 자동 이동은 조각을 남기지 않고 통째로 뺀다 */
     if (b.s < O.s) out.push({ ...b, e:O.s });
     if (b.e > O.e) out.push({ ...b, s:O.e, key:(b.key || 'b') + '+' });
   }
@@ -1252,7 +1253,7 @@ function applyOverlays(blocks, D, wake, sleep, isSchool){
         if (c < O.e) pcs.push([c, O.e]);
         const best = pcs.filter(p => p[1] - p[0] >= 5).sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]))[0];
         /* 공부·쉬기·식사가 일부만 겹치면 알아서 겹치지 않는 쪽만 넣고 묻지 않는다 */
-        if (!(best && ['study','rest','meal'].includes(O.type)))
+        if (!(best && ['study','rest','meal','free'].includes(O.type)))
         trims.push({ label:O.label, key:O.key, kind:O.type, with:hard[0].label, from:[O.s, O.e], to:best || null,
           hard:hard.map(h => ({ label:h.label, s:h.s, e:h.e, key:h.key, type:h.type, ev: h.ev ? (h.ev.extra ? 'x:' + h.ev.id : h.ev.id) : null })) });
         if (!best) continue;
@@ -1264,9 +1265,11 @@ function applyOverlays(blocks, D, wake, sleep, isSchool){
   out.sort((a,b) => a.s - b.s);
   // 비는 시간은 공부로 채우기
   const filled = [];
+  let reach = -1;   /* 지금까지 가장 늦게 끝난 시각: 긴 칸 안에 짧은 칸이 겹쳐 있어도 그 사이를 빈 시간으로 보지 않는다 */
   for (let i = 0; i < out.length; i++){
     const b = out[i], n = out[i+1]; filled.push(b);
-    const gs = b.e, ge = n ? n.s : sleep;
+    if (!b.marker) reach = Math.max(reach, b.e);
+    const gs = reach, ge = n ? n.s : sleep;
     if (!b.marker && ge - gs >= 5){
       filled.push({ s:gs, e:ge, label:'쉬는 시간', type:'rest', key:'gap:' + gs, custom:true });
     }
@@ -1335,7 +1338,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "54b568bfdea6";
+const BUILD = "079470547e9c";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1933,6 +1936,7 @@ function simplifyBlocks(blocks, opt){
     const b = { ...b0, members:[b0.s] };
     if (b.type === 'wake') b.label = '기상 · 준비';
     const last = out[out.length - 1];
+    if (last && b.type === 'free' && last.type === 'free' && b.s === last.e){ last.e = b.e; last.members.push(b.s); continue; }
     if (last && b.type === 'study' && last.type === 'study' && !b.fixedTag && !last.fixedTag && /^g:/.test(b.key || '') && /^g:/.test(last.key || '') && last.label === b.label && b.s === last.e){ last.e = b.e; last.members.push(b.s); continue; }
     out.push(b);
   }
@@ -2683,6 +2687,12 @@ function fillSheetHTML(st){
   return `<div class="sf" style="padding:0 16px 14px;font-size:15px"><b>${esc(b.label)} ${fmt(b.s)}–${fmt(b.e)}</b>을 지우면 이 시간이 빕니다. 어떻게 할까요?</div>`
     + grp('', opts.map(([v, l, d0]) => `<button class="rw tap ${v === 'other' ? 'add' : ''}" data-act="fillgo" data-v="${v}"><div class="mid"><div class="tt">${l}</div><div class="st">${d0}</div></div>${v === 'other' ? IC.chv : ''}</button>`).join(''));
 }
+/* 붙어 있는 빈 시간은 한 칸으로 */
+function mergeFree(D){
+  const F = (D.extra || []).filter(x => x.kind === 'free').sort((a, b) => clockMin(a.start) - clockMin(b.start)), keep = [];
+  for (const x of F){ const p = keep[keep.length - 1]; if (p && clockMin(x.start) <= clockMin(p.end)){ if (clockMin(x.end) > clockMin(p.end)) p.end = x.end; x._drop = true; } else keep.push(x); }
+  D.extra = D.extra.filter(x => !x._drop);
+}
 function fillGo(st, v){
   const d = st.date, k = st.key, { b } = findBlock(d, k); if (!b) return;
   const keys = /^cx:|^gap:|^seg:/.test(k) ? [] : blkKeysOf(d, k), s0 = b.s, e0 = b.e;
@@ -2692,7 +2702,7 @@ function fillGo(st, v){
     else if (!/^gap:|^seg:/.test(k)){ D.blk = D.blk || {}; for (const kk of keys) D.blk[kk] = { hide:true }; }
     const add = (kind, name) => { const id = uid(); D.extra = D.extra || []; D.extra.push({ id, name, start:fmt(s0), end:fmt(e0), kind, tag: kind === 'study' ? 'hw' : undefined, place:'here' }); return 'cx:' + id; };
     if (v === 'study'){ nk = add('study', '공부'); const run = studyRun(d, nk, D); if (run.length > 1) mergeRun(d, D, run); }
-    else if (v === 'free') add('free', '빈 시간');
+    else if (v === 'free'){ add('free', '빈 시간'); mergeFree(D); }
     else if (v === 'rest' && /^seg:/.test(k)) add('rest', '쉬는 시간');
     else if (v === 'other' && /^seg:/.test(k)) add('free', '빈 시간');
   });
