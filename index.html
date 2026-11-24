@@ -1236,7 +1236,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "3eb837171649";
+const BUILD = "f705abf642b8";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1470,7 +1470,10 @@ function undo1(){
   render(); toast('되돌렸습니다');
 }
 function save(path, data){
-  { const now = JSON.stringify(data ?? null); recordUndo(path, now); LAST[path] = now; }
+  { const now = JSON.stringify(data ?? null);
+    /* 열린 창(과 그 위 창들)마다 처음 상태를 기억해 두었다가 '취소'하면 되돌린다 */
+    if (!undoing) for (let s0 = sheet; s0; s0 = s0.prev){ s0.snap = s0.snap || {}; if (!(path in s0.snap)) s0.snap[path] = path in LAST ? LAST[path] : 'null'; }
+    recordUndo(path, now); LAST[path] = now; }
   if (mode === 'local'){ try { localStorage.setItem('planner:' + path, JSON.stringify(data)); } catch(e){} return; }
   if (!db) return;
   pend[path] = clone(data);
@@ -2267,13 +2270,56 @@ function viewHW(){
 
 /* ===== 시트 ===== */
 function openSheet(s){ sheet = s; render(); }
+/* 창 위 '저장': 고른 것을 적용하고 닫는다 (위에 겹친 창이면 아래 창으로 돌아간다) */
+const FORM_SAVE = { add:'addsave', flex:'fxsave', hw:'hfadd', breaks:'brkadd' };
+function fireAct(act, data){ const b = document.createElement('button'); b.dataset.act = act; Object.assign(b.dataset, data || {}); b.hidden = true; document.body.appendChild(b); b.click(); b.remove(); }
+function sheetSave(){
+  const ae = document.activeElement; if (ae && ae.blur && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) ae.blur();
+  const st = sheet; if (!st) return;
+  if (st.type === 'when'){
+    if (st.pick && st.pick.custom){ const a = $('#wh-s'), z = $('#wh-e'); if (a && z && st.pick.d === (st.selD || st.date)){ st.form.s = a.value; st.form.e = z.value; } fireAct('whencustom2'); return; }
+    if (st.pick){ fireAct('whenapply', { v:st.pick.v }); return; }
+    /* 칸은 그대로, 시간만 바꾼 경우 */
+    const B = simplifyBlocks(buildDay(S, st.date, getDay(st.date)).blocks), P = planFor(st.date, B), t = P.tasks.find(x => x.tk === st.tk), k = P.map[st.tk];
+    if (t && st.dur != null){
+      let dur = st.dur;
+      if (dur === 'full'){ const b = B.find(x => x.key === k); dur = b ? Math.max(30, (b.e - b.s) - P.tasks.filter(y => P.map[y.tk] === k && y.tk !== st.tk).reduce((a, y) => a + y.min, 0)) : null; }
+      if (dur && dur !== t.min){ setTaskMin(st.date, st.tk, dur); toast(durShort(dur) + ' 하기로 했습니다'); }
+    }
+    sheet = st.prev || null; render(); return;
+  }
+  const fa = FORM_SAVE[st.type] || (st.type === 'acad' && st.isNew ? 'naadd' : null);
+  if (fa){
+    const pb = document.querySelector(`#sbody [data-act="${fa}"]`);
+    const empty = st.type === 'hw' ? !(($('#hf-title') || {}).value || '').trim() : st.type === 'breaks' ? !(st.pick && st.pick.length) : false;
+    if (pb && !pb.disabled && !empty){ pb.click(); if (sheet === st) { sheet = st.prev || null; render(); } return; }
+    if (st.type === 'flex' && pb && pb.disabled){ toast('요일을 골라 주세요'); return; }
+  }
+  sheet = st.prev || null; render();
+}
+/* 창 위 '취소': 이 창을 연 뒤에 바뀐 것을 모두 되돌리고 닫는다 */
+function sheetCancel(){
+  const st = sheet; if (!st) return;
+  const ae = document.activeElement; if (ae && ae.blur && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) ae.blur();
+  setTimeout(() => {
+    const snap = st.snap || {};
+    if (Object.keys(snap).length){
+      undoing = true;
+      try { for (const [path, js] of Object.entries(snap)){ const v = js && js !== 'null' ? JSON.parse(js) : null; applyLocal(path, v); save(path, v || {}); } }
+      finally { undoing = false; }
+      for (let p0 = st.prev; p0; p0 = p0.prev) if (p0.snap) for (const k in snap) if (p0.snap[k] === undefined) p0.snap[k] = snap[k];
+    }
+    if (sheet === st){ sheet = st.prev || null; delArm = null; }
+    renderSheet.back = !!st.prev; render();
+  }, 60);
+}
 function renderSheet(){
   const el = $('#sheet'), scr = $('#scrim');
   if (!sheet){ el.classList.remove('on'); scr.classList.remove('on'); setTimeout(() => { if (!sheet){ $('#sbody').innerHTML = ''; $('#sbody').dataset.key = ''; } }, 320); return; }
-  let title = '', body = '', left = sheet.prev ? '‹ 뒤로' : '', right = '완료';
+  let title = '', body = '', right = '저장';
   if (sheet.type === 'day'){ title = shortDate(sheet.date); body = daySheetHTML(sheet.date); }
   else if (sheet.type === 'acad'){ const r = acadSheetHTML(sheet); title = r.title; body = r.body; }
-  else if (sheet.type === 'hw'){ title = '숙제 추가'; body = hwSheetHTML(); right = '닫기'; }
+  else if (sheet.type === 'hw'){ title = '숙제 추가'; body = hwSheetHTML(); }
   else if (sheet.type === 'times'){ title = '시간 · 이동'; body = timesSheetHTML(); }
   else if (sheet.type === 'weekly'){ title = '설정'; body = weeklySheetHTML() + timesSheetHTML(); }
   else if (sheet.type === 'flex'){ const f = (S.flex||[]).find(y => y.id === sheet.fid); title = (f ? f.name : '') + ' 넣기'; body = flexSheetHTML(); }
@@ -2291,7 +2337,8 @@ function renderSheet(){
   else if (sheet.type === 'print'){ title = '인쇄'; body = printSheetHTML(); right = '닫기'; }
   else if (sheet.type === 'pdfready'){ title = 'PDF'; right = '닫기'; body = PDFREADY ? `<div class="sf" style="padding:0 16px 14px;font-size:15px">${esc(PDFREADY.name)}</div>` + grp('', `<button class="rw tap add" data-act="pdfsave"><div class="mid"><div class="tt">PDF 저장</div><div class="st">다운로드 폴더에 저장됩니다</div></div></button>`) : ''; }
   const key = sheet.type + (sheet.key || '') + (sheet.date || '') + (sheet.fid || '') + (sheet.isNew ? 'n' : '') + (sheet.s != null ? 's' + sheet.s : '');
-  morph($('#shd'), `<button></button><b>${esc(title)}</b><button class="r" data-act="sheetclose">${right}</button>`);
+  const viewOnly = right === '닫기';
+  morph($('#shd'), `<button class="l" ${viewOnly ? '' : 'data-act="sheetcancel"'}>${viewOnly ? '' : '취소'}</button><b>${esc(title)}</b><button class="r" data-act="${viewOnly ? 'sheetclose' : 'sheetsave'}">${viewOnly ? '닫기' : '저장'}</button>`);
   const sb = $('#sbody');
   if (sb.dataset.key !== key){ const swap = el.classList.contains('on') && sb.dataset.key; sb.innerHTML = body; sb.scrollTop = 0; sb.dataset.key = key; if (swap){ const c = renderSheet.back ? 'slR' : 'slL'; sb.classList.remove('slL', 'slR'); void sb.offsetWidth; sb.classList.add(c); setTimeout(() => sb.classList.remove(c), 420); } } else morph(sb, body); renderSheet.back = false;
   el.classList.add('on'); scr.classList.add('on');
@@ -2568,7 +2615,8 @@ function whenSheetHTML(st){
   const daily = t.kind === 'daily';
   const selD = st.selD || (st.selD = st.date);
   const blocks = simplifyBlocks(buildDay(S, selD, getDay(selD)).blocks), P = planFor(selD, blocks);
-  const curK = selD === st.date ? P0.map[st.tk] : null;
+  const curK0 = selD === st.date ? P0.map[st.tk] : null;
+  const curK = st.pick ? (!st.pick.custom && st.pick.d === selD ? st.pick.v : null) : curK0;
   let b = `<div class="sf" style="padding:0 16px 12px;font-size:15px">${esc(t.text)}</div>`;
   if (!daily){
     const pills = [0,1,2,3,4,5,6,7].map(i => { const d = addDays(st.date, i); return `<button class="dp ${selD === d ? 'on' : ''}" data-act="whenday" data-v="${d}"><small>${i === 0 ? '그날' : i === 1 ? '다음날' : DAYS[dowOf(d)]}</small><b>${parseYmd(d).getDate()}</b></button>`; }).join('');
@@ -2587,8 +2635,8 @@ function whenSheetHTML(st){
   b += grp(shortDate(selD) + ' 칸 고르기', rows);
   const f = st.form || (st.form = { s:'21:00', e:'22:00' });
   b += grp('직접 시간 정하기', `<div class="rw"><div class="mid" style="flex:none"><div class="tt">시간</div></div><span style="flex:1"></span><input type="time" id="wh-s" value="${f.s}"><span class="val">~</span><input type="time" id="wh-e" value="${f.e}"></div>
-    <button class="rw tap add" data-act="whencustom"><div class="mid"><div class="tt">${shortDate(selD)} 이 시간에 하기</div></div></button>`, '야자·집 공부 같은 공부 칸 안이면 그 칸의 할 일로 들어가고, 빈 시간이면 공부 칸이 새로 생깁니다.');
-  if (selD === st.date) b += grp('', `<button class="rw tap" data-act="setwhen2" data-v="none"><div class="mid"><div class="tt" style="color:var(--sub)">시간 안 정함</div></div>${!curK ? IC.tick : ''}</button>`);
+    <button class="rw tap add" data-act="whencustom"><div class="mid"><div class="tt">${shortDate(selD)} 이 시간에 하기</div></div>${st.pick && st.pick.custom && st.pick.d === selD ? IC.tick : ''}</button>`, '야자·집 공부 같은 공부 칸 안이면 그 칸의 할 일로 들어가고, 빈 시간이면 공부 칸이 새로 생깁니다.');
+  if (selD === st.date) b += grp('', `<button class="rw tap" data-act="setwhen2" data-v="none"><div class="mid"><div class="tt" style="color:var(--sub)">시간 안 정함</div></div>${(st.pick ? st.pick.v === 'none' : !curK0) ? IC.tick : ''}</button>`);
   return { title:'언제 할까요?', body:b };
 }
 function addSheetHTML(st){
@@ -2788,6 +2836,8 @@ document.addEventListener('click', e => {
     case 'openweekly': openSheet({ type:'weekly', prev: sheet && sheet.type !== 'weekly' ? sheet : null }); return;
     case 'opentimes': openSheet({ type:'times' }); return;
     case 'sheetclose': sheet = null; render(); return;
+    case 'sheetsave': sheetSave(); return;
+    case 'sheetcancel': sheetCancel(); return;
     case 'sheetback': if (sheet && sheet.prev){ sheet = sheet.prev; renderSheet.back = true; render(); } return;
     case 'undo': undoChange(d, t.dataset.k); toast('되돌렸습니다'); return;
     case 'yaja': {
@@ -2853,7 +2903,10 @@ document.addEventListener('click', e => {
     case 'whenday': { const n = v > sheet.selD ? 1 : -1; if (v === sheet.selD) return; sheet.selD = v; ensureWeek(weekStartOf(v)); render(); slideSheetAfter('.dp.on', n); return; }
     case 'whendur': sheet.dur = v === 'full' ? 'full' : +v; render(); return;
     case 'whendurn': sheet.dur = Math.max(10, Math.min(600, (+sheet.dur || 30) + +t.dataset.n)); render(); return;
-    case 'setwhen2': { const st = sheet, to = st.selD || st.date;
+    case 'setwhen2': sheet.pick = { v, d:sheet.selD || sheet.date }; render(); return;
+    case 'whencustom': { const s1 = $('#wh-s').value, e1 = $('#wh-e').value; if (!s1 || !e1 || clockMinUI(e1) <= clockMinUI(s1)){ toast('시간을 확인해 주세요'); return; }
+      sheet.form.s = s1; sheet.form.e = e1; sheet.pick = { custom:true, d:sheet.selD || sheet.date }; render(); return; }
+    case 'whenapply': { const st = sheet, to = (st.pick && st.pick.d) || st.selD || st.date;
       let dur = null;
       if (v !== 'none'){ const B = simplifyBlocks(buildDay(S, to, getDay(to)).blocks), P = planFor(to, B), b = B.find(x => x.key === v);
         if (st.dur === 'full' && b){ const used = P.tasks.filter(y => P.map[y.tk] === v && y.tk !== st.tk).reduce((a, y) => a + y.min, 0); dur = Math.max(30, (b.e - b.s) - used); }
@@ -2863,7 +2916,7 @@ document.addEventListener('click', e => {
       if (dur) setTaskMin(to, st.tk, dur);
       if (to === st.date) toast(v === 'none' ? '시간 안 정함' : dur ? durShort(dur) + ' 하기로 했습니다' : '옮겼습니다');
       return; }
-    case 'whencustom': { const st = sheet, s = $('#wh-s').value, e2 = $('#wh-e').value, to = st.selD || st.date;
+    case 'whencustom2': { const st = sheet, s = st.form.s, e2 = st.form.e, to = st.pick.d || st.date;
       if (!s || !e2 || clockMinUI(e2) <= clockMinUI(s)){ toast('시간을 확인해 주세요'); return; }
       const P0 = planFor(st.date, simplifyBlocks(buildDay(S, st.date, getDay(st.date)).blocks)), tk0 = P0.tasks.find(x => x.tk === st.tk);
       const id = uid(), sM = clockMinUI(s), eM = clockMinUI(e2), hb = hostBlock(to, sM, eM);
@@ -3127,7 +3180,8 @@ document.addEventListener('compositionend', e => { imeOn = false; if (imeEnter &
 /* 컴퓨터: 단축키 */
 document.addEventListener('keydown', e => {
   const tg = e.target, typing = tg && (/INPUT|TEXTAREA|SELECT/.test(tg.tagName) || tg.isContentEditable);
-  if (e.key === 'Escape' && sheet){ e.preventDefault(); if (typing) tg.blur(); sheet = null; delArm = null; render(); return; }
+  if (e.key === 'Escape' && sheet){ e.preventDefault(); sheetCancel(); return; }
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && sheet){ e.preventDefault(); sheetSave(); return; }
   if (typing || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const go = f => { e.preventDefault(); f(); };
