@@ -1280,7 +1280,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "b836ad2f70dd";
+const BUILD = "54483c90819b";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1854,7 +1854,7 @@ function simplifyBlocks(blocks, opt){
     if (b0.type === 'rest' && !rests && d < 60 && !(b0.custom && !String(b0.key).startsWith('gap:'))) continue;
     if (b0.key === 'wash' && !rests) continue;
     if (b0.type === 'rest' && d < 5) continue;
-    if (b0.type === 'travel' && d < 20 && !(b0.custom && b0.cx)) continue;   /* 직접 넣은 이동은 짧아도 보인다 */
+    if (b0.type === 'travel' && d < 5) continue;   /* 10분짜리 이동(학교 → 학원, 학원 → 집)도 보인다 */
     if (b0.type === 'check' && d <= 10) continue;
     const b = { ...b0, members:[b0.s] };
     if (b.type === 'wake') b.label = '기상 · 준비';
