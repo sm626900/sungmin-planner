@@ -886,6 +886,39 @@ html.desk .msr-a:hover{background:color-mix(in srgb,var(--fill) 60%,transparent)
 .tlx{position:relative;height:18px;margin-left:68px}
 .tlx span{position:absolute;top:0;transform:translateX(-50%);font-size:10.5px;color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
 .tlx span i{display:block;width:1px;height:4px;background:var(--sep);margin:0 auto 2px}
+/* 세로 미니 시간표 (겹침 자세히) */
+.vtl{background:var(--card);border-radius:12px;padding:10px 12px 14px;margin:0 0 14px}
+.vth{display:grid;grid-template-columns:44px 1fr 1fr;gap:8px;font-size:11.5px;color:var(--sub);margin-bottom:8px}
+.vtb{position:relative;display:grid;grid-template-columns:44px 1fr 1fr;gap:8px}
+.vtx{position:relative}
+.vtx span{position:absolute;right:2px;transform:translateY(-50%);font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums}
+.vlane{position:relative;background:var(--fill);border-radius:8px}
+.vb{position:absolute;left:3px;right:3px;border-radius:6px;background:color-mix(in srgb,var(--c) 24%,var(--card));border-left:3px solid var(--c);padding:4px 7px;overflow:hidden;display:flex;flex-direction:column;gap:1px}
+.vb b{font-size:13px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vb small{font-size:11.5px;color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
+.vb.one{flex-direction:row;align-items:center;gap:6px;padding:0 7px}
+.vb.one b{font-size:12px}.vb.one small{font-size:10.5px}
+.vb.tiny b,.vb.tiny small{display:none}
+.vb.dim{opacity:.5}
+.vb.mine{background:color-mix(in srgb,var(--red) 14%,var(--card));border:1.5px dashed var(--red);border-left:3px solid var(--red)}
+.vo{position:absolute;left:52px;right:0;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--red) 26%,transparent) 0 3px,transparent 3px 9px);border-top:1.5px solid var(--red);border-bottom:1.5px solid var(--red);pointer-events:none;border-radius:2px}
+/* 추가 창 미니 시간표 */
+.mtl{position:relative;margin:0 0 6px;background:var(--card);border-radius:12px;padding:10px 12px 10px 0}
+.mtl .mtb{position:absolute;left:58px;right:12px;border:0;text-align:left;border-radius:7px;background:color-mix(in srgb,var(--c) 18%,var(--card));border-left:3px solid var(--c);padding:0 9px;display:flex;align-items:center;gap:8px;overflow:hidden;font-size:13px;color:var(--text)}
+.mtl .mtb b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mtl .mtb small{margin-left:auto;color:var(--sub);font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mtl .mtt{position:absolute;left:4px;width:48px;transform:translateY(-50%);border:0;background:none;color:var(--sub);font-size:11.5px;font-variant-numeric:tabular-nums;padding:3px 0;border-radius:999px;z-index:2}
+.mtl .mtt.on{background:var(--tint);color:#fff;font-weight:700}
+html.desk .mtl .mtt:hover{background:var(--fill);color:var(--text)}
+.mtl .mtp{position:absolute;left:58px;right:12px;border:2px solid var(--tint);background:color-mix(in srgb,var(--tint) 22%,transparent);border-radius:7px;z-index:1;pointer-events:none;display:flex;align-items:center;justify-content:flex-end;padding:0 8px;transition:top .2s cubic-bezier(.2,.8,.2,1),height .2s cubic-bezier(.2,.8,.2,1)}
+.mtl .mtp span{font-size:11.5px;font-weight:700;color:#fff;background:var(--tint);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.jbday{background:var(--card);border-radius:12px;padding:10px 14px 6px;margin-bottom:12px;box-shadow:var(--shadow)}
+.jbh{font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:4px}
+.jbl{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:.5px solid var(--sep)}
+.jbl:first-of-type{border-top:0}
+.jbn{flex:1;min-width:0;display:flex;flex-direction:column;border-left:3px solid var(--c);padding-left:8px}
+.jbn b{font-size:14.5px;font-weight:600}
+.jbn small{font-size:12px;color:var(--sub)}
 /* ===== 컴퓨터 화면 (html.desk) ===== */
 html.desk body{padding-left:228px}
 html.desk .wrap{padding:22px 32px 48px}
@@ -1202,6 +1235,8 @@ function applyOverlays(blocks, D, wake, sleep, isSchool){
         for (const h of hard){ if (h.s > c) pcs.push([c, Math.min(h.s, O.e)]); c = Math.max(c, h.e); }
         if (c < O.e) pcs.push([c, O.e]);
         const best = pcs.filter(p => p[1] - p[0] >= 5).sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]))[0];
+        /* 공부·쉬기·식사가 일부만 겹치면 알아서 겹치지 않는 쪽만 넣고 묻지 않는다 */
+        if (!(best && ['study','rest','meal'].includes(O.type)))
         trims.push({ label:O.label, key:O.key, kind:O.type, with:hard[0].label, from:[O.s, O.e], to:best || null,
           hard:hard.map(h => ({ label:h.label, s:h.s, e:h.e, key:h.key, type:h.type, ev: h.ev ? (h.ev.extra ? 'x:' + h.ev.id : h.ev.id) : null })) });
         if (!best) continue;
@@ -1284,7 +1319,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "79e0c898a50b";
+const BUILD = "03f91f2f46b7";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -2134,6 +2169,11 @@ function viewToday(){
   const unset = [...new Set((S.academies||[]).filter(a => a.day == null || !a.start).map(a => a.name))];
   if (unset.length) h += `<div class="banner info tap" data-act="openweekly">${IC.info}<div>${unset.map(esc).join(', ')} 시간이 비어 있습니다 <span style="color:var(--tint)">넣기 ›</span></div></div>`;
   for (const w of R.warnings) h += banner(esc(w));
+  /* 시험 기간: 곧 볼 시험의 학원 직보를 이 날에 바로 넣는다 */
+  if (typeof jbSubjectsFor === 'function'){ const J = jbSubjectsFor(cur).slice(0, 4);
+    if (J.length){ const mine = (D.extra || []).filter(x => x.jikbo);
+      h += `<div class="jbday"><div class="jbh">시험 직보</div>${J.map(x => { const n = dayDiff(cur, x.date), have = mine.filter(m => m.jikbo === x.id);
+        return `<div class="jbl" style="--c:${x.color}"><span class="jbn"><b>${esc(x.name)}</b><small>${n === 1 ? '내일' : n + '일 뒤'} · ${shortDate(x.date)} ${x.per}</small></span>${have.map(m => `<button class="jbchip" data-act="openacad" data-k="x:${m.id}" data-d="${cur}"><b>직보</b> ${m.start}–${m.end}</button>`).join('')}<button class="jbadd" data-act="openadd" data-d="${cur}" data-kind="jikbo" data-sid="${x.id}">+ 직보</button></div>`; }).join('')}</div>`; } }
   for (const q of travelAsks(R, D)) h += `<div class="banner info">${IC.info}<div><b>${fmt(q.s)} ${esc(q.from)} → 집</b> 가는 이동이 없습니다. ${durShort(q.n)} 걸립니다.<div class="mbtns"><button class="ci" style="color:var(--tint)" data-act="addtr" data-d="${cur}" data-s="${q.s}" data-n="${q.n}" data-l="${q.label}">${fmt(q.s)}–${fmt(q.s + q.n)} ${q.label} 넣기</button><button class="ci" data-act="noask" data-d="${cur}" data-s="${q.s}">안 넣기</button></div></div></div>`;
   (R.trims || []).forEach((t, i) => { const w = /^이동|^귀가|^등교/.test(t.with) ? '이동 시간' : t.with;
     h += `<div class="banner tap" data-act="opentrim" data-d="${cur}" data-i="${i}">${IC.warn}<div><b>${esc(t.label)} ${fmt(t.from[0])}–${fmt(t.from[1])}</b>${josa(t.label, '이', '가')} ${esc(w)}${josa(w, '과', '와')} ${t.to ? '일부' : '완전히'} 겹칩니다 <span style="color:var(--tint);white-space:nowrap">자세히 보기 ›</span></div></div>`; });
@@ -2588,21 +2628,26 @@ function trimSheetHTML(st){
   const R = buildDay(S, st.date, getDay(st.date)), t = (R.trims || [])[st.i];
   if (!t) return `<div class="sf" style="padding:0 16px 14px;font-size:15px">이제 겹치는 일정이 없습니다.</div>`;
   const [s0, e0] = t.from, H = t.hard, lo = Math.floor((Math.min(s0, ...H.map(h => h.s)) - 30) / 30) * 30, hi = Math.ceil((Math.max(e0, ...H.map(h => h.e)) + 30) / 30) * 30;
-  const X = m => ((m - lo) / (hi - lo) * 100).toFixed(2) + '%', W = (a, z) => ((z - a) / (hi - lo) * 100).toFixed(2) + '%';
   const near = simplifyBlocks(R.blocks, { rests:true }).filter(b => b.e > lo && b.s < hi && b.key !== t.key && !H.some(h => h.key === b.key));
   const mine = { travel:'이동', rest:'쉬기', meal:'식사', study:'공부' }[t.kind] || '일정';
-  let ticks = ''; for (let m = lo; m <= hi; m += 30) ticks += `<span style="left:${X(m)}"><i></i>${m % 60 === 0 ? fmt(m) : ''}</span>`;
-  const bar = (b, cls, lbl) => `<div class="tlb ${cls}" style="left:${X(Math.max(b.s, lo))};width:${W(Math.max(b.s, lo), Math.min(b.e, hi))};--c:${cls === 'mine' ? 'var(--red)' : colorOf(b)}"><b>${esc(lbl || b.label)}</b><small>${fmt(b.s)}–${fmt(b.e)}</small></div>`;
   const ov = H.map(h => [Math.max(h.s, s0), Math.min(h.e, e0)]).filter(([a, z]) => z > a);
-  let g = `<div class="tlv"><div class="tlr"><span class="tll">시간표</span><div class="tlt">${near.map(b => bar(b, 'dim')).join('')}${H.map(h => bar(h, 'hard')).join('')}${ov.map(([a, z]) => `<div class="tlo" style="left:${X(a)};width:${W(a, z)}"></div>`).join('')}</div></div>`
-    + `<div class="tlr"><span class="tll">넣은 ${mine}</span><div class="tlt">${bar({ s:s0, e:e0 }, 'mine', t.label)}${ov.map(([a, z]) => `<div class="tlo" style="left:${X(a)};width:${W(a, z)}"></div>`).join('')}</div></div>`
-    + `<div class="tlx">${ticks}</div></div>`;
+  /* 세로 시간표: 왼쪽은 원래 시간표, 오른쪽은 넣은 것. 겹치는 곳은 빨간 빗금 */
+  const PX = Math.min(1.6, Math.max(.45, 360 / (hi - lo))), Y = m => Math.round((Math.max(lo, Math.min(hi, m)) - lo) * PX), HT = Y(hi);
+  const step = hi - lo > 300 ? 60 : 30;
+  let ticks = ''; for (let m = lo; m <= hi; m += step) ticks += `<span style="top:${Y(m)}px">${fmt(m)}</span>`;
+  const bar = (b, cls, lbl) => { const y1 = Y(b.s), y2 = Y(b.e), hh = Math.max(2, y2 - y1);
+    return `<div class="vb ${cls} ${hh < 34 ? 'one' : ''} ${hh < 16 ? 'tiny' : ''}" style="top:${y1}px;height:${hh}px;--c:${cls === 'mine' ? 'var(--red)' : colorOf(b)}"><b>${esc(lbl || b.label)}</b><small>${fmt(b.s)}–${fmt(b.e)}</small></div>`; };
+  const hatch = ov.map(([a, z]) => `<div class="vo" style="top:${Y(a)}px;height:${Math.max(2, Y(z) - Y(a))}px"></div>`).join('');
+  const g = `<div class="vtl"><div class="vth"><span></span><span>시간표</span><span>넣은 ${mine}</span></div>
+    <div class="vtb" style="height:${HT}px"><div class="vtx">${ticks}</div>
+      <div class="vlane">${near.map(b => bar(b, 'dim')).join('')}${H.map(h => bar(h, 'hard')).join('')}</div>
+      <div class="vlane">${bar({ s:s0, e:e0 }, 'mine', t.label)}</div>${hatch}</div></div>`;
   const hn = H.map(h => `${esc(h.label)}(${fmt(h.s)}–${fmt(h.e)})`).join(', ');
   const why = t.to
     ? `직접 넣은 <b>${esc(t.label)} ${fmt(s0)}–${fmt(e0)}</b> 중 <b>${ov.map(([a, z]) => fmt(a) + '–' + fmt(z)).join(', ')}</b>이 ${hn} 시간과 겹칩니다. 학원·학교·이동처럼 옮길 수 없는 일정이 먼저라서, 겹치지 않는 <b>${fmt(t.to[0])}–${fmt(t.to[1])}</b>만 시간표에 넣었습니다.`
     : `직접 넣은 <b>${esc(t.label)} ${fmt(s0)}–${fmt(e0)}</b>이 ${hn} 안에 완전히 들어가 있습니다. 학원·학교·이동처럼 옮길 수 없는 일정이 먼저라서 시간표에 넣지 못했습니다.`;
   let b = `<div class="trimwhy">${why}</div>` + g;
-  if (/^cx:/.test(t.key) && t.kind === 'travel' && H.some(h => h.type === 'acad')) b += `<div class="sf" style="padding:0 16px 12px">학원 시간을 바꾸기 전에 넣어 둔 이동이 남아 있는 것일 수 있습니다.</div>`;
+  if (/^cx:/.test(t.key) && t.kind === 'travel' && H.some(h => h.type === 'acad' && !/^시험/.test(h.label))) b += `<div class="sf" style="padding:0 16px 12px">학원 시간을 바꾸기 전에 넣어 둔 이동이 남아 있는 것일 수 있습니다.</div>`;
   let acts = '';
   if (t.to) acts += `<button class="rw tap add" data-act="fixtrim" data-d="${st.date}" data-k="${esc(t.key)}" data-v="${t.to.join(',')}"><div class="mid"><div class="tt">${fmt(t.to[0])}–${fmt(t.to[1])}로 저장</div><div class="st">겹치는 부분을 빼고 저장합니다</div></div></button>`;
   acts += `<button class="rw tap" data-act="openblk" data-k="${esc(t.key)}" data-d="${st.date}"><div class="mid"><div class="tt">${esc(t.label)} 시간 바꾸기</div></div>${IC.chv}</button>`;
@@ -2757,26 +2802,43 @@ function whenSheetHTML(st){
   if (selD === st.date) b += grp('', `<button class="rw tap" data-act="setwhen2" data-v="none"><div class="mid"><div class="tt" style="color:var(--sub)">시간 안 정함</div></div>${(st.pick ? st.pick.v === 'none' : !curK0) ? IC.tick : ''}</button>`);
   return { title:'언제 할까요?', body:b };
 }
+/* 추가 창의 작은 하루 시간표: 칸을 누르면 그 칸 시작, 왼쪽 시각을 누르면 그 시각부터. 넣을 자리를 파란 칸으로 미리 보여 준다 */
+function miniTL(date, f){
+  const L = simplifyBlocks(buildDay(S, date, getDay(date)).blocks, { rests:true }).filter(x => x.e > x.s);
+  if (!L.length) return '';
+  const segs = []; let y = 4, t = L[0].s;
+  for (const b of L){ if (b.s > t){ const h = Math.min(14, (b.s - t) * .4); segs.push({ s:t, e:b.s, y, h }); y += h; }
+    const h = Math.max(26, Math.min(64, Math.round((b.e - b.s) * .42))); segs.push({ s:b.s, e:b.e, y, h, b }); y += h; t = Math.max(t, b.e); }
+  const yOf = m => { if (m <= segs[0].s) return segs[0].y; for (const sg of segs) if (m >= sg.s && m <= sg.e) return sg.y + sg.h * (m - sg.s) / Math.max(1, sg.e - sg.s); return y; };
+  const sM = clockMinUI(f.start), eM = clockMinUI(f.end);
+  let h = '';
+  for (const sg of segs) if (sg.b){ const b = sg.b; h += `<button class="mtb" data-act="addat" data-v="${b.s}" style="top:${sg.y + 1.5}px;height:${sg.h - 3}px;--c:${colorOf(b)}"><b>${esc(b.label)}</b><small>${fmt(b.s)}–${fmt(b.e)}</small></button>`; }
+  const ts = [...new Set(L.map(b => b.s).concat(L.map(b => b.e)))].sort((a, z) => a - z); let last = -99;
+  for (const m of ts){ const yy = yOf(m); if (yy - last < 15 && m !== sM) continue; last = yy; h += `<button class="mtt ${m === sM ? 'on' : ''}" data-act="addat" data-v="${m}" style="top:${yy}px">${fmt(m)}</button>`; }
+  if (eM > sM){ const y1 = yOf(sM), y2 = yOf(eM), nm = (f.name || '').trim() || ({ meal:'식사', rest:'쉬기', study:'공부', travel:'이동', event:'일정', jikbo:'직보' })[f.kind] || '';
+    h += `<div class="mtp" style="top:${y1}px;height:${Math.max(8, y2 - y1)}px"><span>${esc(nm)} ${fmt(sM)}–${fmt(eM)}</span></div>`; }
+  return `<div class="mtl" style="height:${y + 8}px">${h}</div>`;
+}
 function addSheetHTML(st){
   const f = st.form || (st.form = { kind: st.kind || (st.s != null ? 'meal' : 'event'), name:'', start: st.s != null ? fmt(st.s) : '18:00', end: st.e != null ? fmt(st.kind ? st.e : Math.min(st.e, st.s + 40)) : '19:00', tag:'hw', place:'home' });
-  const ph = { meal:'저녁', rest:'쉬기', study:'수학 오답 정리', travel:'차로 이동', event:'국어 재시 · 약속' }[f.kind];
+  if (f.kind === 'jikbo' && !f.sid && typeof jbSubjectsFor === 'function'){ const sub = (st.sid && EX.subjects.find(x => x.id === st.sid)) || jbSubjectsFor(st.date)[0]; if (sub) jbFill(f, sub); }
+  const ph = { meal:'저녁', rest:'쉬기', study:'수학 오답 정리', travel:'차로 이동', event:'국어 재시 · 약속', jikbo:'영어 학원' }[f.kind];
   let b = `<div class="sf" style="padding:0 16px 14px;font-size:15px">${shortDate(st.date)}에만 들어갑니다. 겹치는 공부 칸은 그만큼 줄어듭니다.</div>`;
-  b += `<div class="segwrap">${seg([['meal','식사'],['rest','쉬기'],['study','공부'],['travel','이동'],['event','일정·학원']], f.kind, 'addkind')}</div>`;
+  const jbs = typeof jbSubjectsFor === 'function' ? jbSubjectsFor(st.date) : [];
+  b += `<div class="segwrap">${seg([['meal','식사'],['rest','쉬기'],['study','공부'],['travel','이동'],['event','일정·학원']].concat(jbs.length ? [['jikbo','직보']] : []), f.kind, 'addkind')}</div>`;
+  if (f.kind === 'jikbo' && jbs.length){
+    b += grp('어느 시험 직보인가요?', `<div class="rw"><div class="mid"><div class="durpills">${jbs.map(x => `<button class="${f.sid === x.id ? 'on' : ''}" data-act="addjbsub" data-v="${x.id}">${esc(x.name)} <small style="opacity:.7">${shortDate(x.date)}</small></button>`).join('')}</div></div></div>`)
+      + grp('학원', `<div class="rw"><div class="mid"><div class="durpills">${jbAcads().map(a => `<button class="${f.name === a.name ? 'on' : ''}" data-act="addjbacad" data-v="${esc(a.name)}">${esc(a.name)}</button>`).join('')}</div></div></div>`);
+  }
   const flt = f.kind === 'meal' && f.mode === 'flex';
   if (f.kind === 'meal') b += `<div class="segwrap">${seg([['fixed','시간 정하기'],['flex','할 일 사이에 넣기']], f.mode || 'fixed', 'addmode')}</div>`;
   b += grp('', `<div class="rw"><div class="mid" style="flex:none"><div class="tt">이름</div></div><input type="text" data-keep="1" id="ad-name" value="${esc(f.name)}" placeholder="${ph}"></div>`
     + (flt ? `<div class="rw"><div class="mid"><div class="tt">얼마나</div></div><div class="step"><button data-act="addmin" data-n="-10">−</button><span>${durShort(f.min || 60)}</span><button data-act="addmin" data-n="10">+</button></div></div>`
       : `<div class="rw"><div class="mid" style="flex:none"><div class="tt">시간</div></div><span style="flex:1"></span><input type="time" id="ad-s" value="${f.start}"><span class="val">~</span><input type="time" id="ad-e" value="${f.end}"></div>`)
     + (f.kind === 'study' ? `<div class="rw"><div class="mid">${seg([['hw','숙제'],['my','내 공부'],['memo','암기'],['review','복습']], f.tag, 'addtag')}</div></div>` : '')
-    + (f.kind === 'event' ? `<div class="rw"><div class="mid"><div class="tt">장소</div></div><select id="ad-p">${[['home','집'],['school','학교 앞'],['daechi','대치']].map(([k,l]) => `<option value="${k}" ${f.place===k?'selected':''}>${l}</option>`).join('')}</select></div>` : ''));
+    + (f.kind === 'event' || f.kind === 'jikbo' ? `<div class="rw"><div class="mid"><div class="tt">장소</div></div><select id="ad-p">${[['home','집'],['school','학교 앞'],['daechi','대치']].map(([k,l]) => `<option value="${k}" ${f.place===k?'selected':''}>${l}</option>`).join('')}</select></div>` : ''));
   if (flt) b += `<div class="sf" style="padding:0 16px 12px">할 일처럼 공부 칸에 들어갑니다. 꾹 눌러서 다른 할 일 사이로 옮길 수 있습니다.</div>`;
-  else {
-    /* 그날 일정: 누르면 그 시작 시각부터, '끝나고'는 끝난 시각부터 (길이는 그대로) */
-    const L = simplifyBlocks(buildDay(S, st.date, getDay(st.date)).blocks, { rests:true }).filter(x => x.e > x.s);
-    const sM = clockMinUI(f.start);
-    const rows = L.map(x => `<div class="rw msr"><button class="msr-a" data-act="addat" data-v="${x.s}"><span class="dot" style="background:${colorOf(x)}"></span><span class="msr-t">${fmt(x.s)}–${fmt(x.e)}</span><span class="msr-n">${esc(x.label)}</span>${sM === x.s ? IC.tick : ''}</button><button class="msr-b ${sM === x.e ? 'on' : ''}" data-act="addat" data-v="${x.e}">끝나고</button></div>`).join('');
-    if (rows) b += grp(shortDate(st.date) + ' 일정', rows, '누르면 그 시간부터 넣습니다. 길이는 그대로입니다.');
-  }
+  else b += `<div class="sec"><div class="sh"><span>${shortDate(st.date)} 시간표</span><span class="tot">칸이나 시각을 누르면 거기서 시작</span></div>${miniTL(st.date, f)}</div>`;
   return b;
 }
 
@@ -3180,14 +3242,22 @@ document.addEventListener('click', e => {
     case 'setwhen': { const tk = t.dataset.tk; setDay(d, D => { D.plan = D.plan || {}; D.plan[tk] = v; });
       if (sheet && sheet.type === 'when'){ sheet = sheet.prev || null; render(); toast(v === 'none' ? '시간 안 정함' : '옮겼습니다'); } return; }
     case 'openblk': ensureDays(); openSheet({ type:'blk', date:d, key:t.dataset.k, prev: sheet && sheet.type === 'day' ? sheet : null }); return;
-    case 'openadd': openSheet({ type:'add', date:d, s: t.dataset.s != null ? +t.dataset.s : null, e: t.dataset.e != null ? +t.dataset.e : null, kind:t.dataset.kind || null, prev:sheet }); return;
-    case 'addkind': { readAdd(); const f = sheet.form; if (f.kind !== v && sheet.e == null){ const a = clockMinUI(f.start); f.end = fmt(a + (({ meal:60, rest:10, travel:20, study:60, event:60 })[v] || 30)); } f.kind = v; render(); return; }
+    case 'openadd': openSheet({ type:'add', date:d, s: t.dataset.s != null ? +t.dataset.s : null, e: t.dataset.e != null ? +t.dataset.e : null, kind:t.dataset.kind || null, sid:t.dataset.sid || null, prev:sheet }); return;
+    case 'addkind': { readAdd(); const f = sheet.form;
+      if (v === 'jikbo' && f.kind !== 'jikbo'){ const L = jbSubjectsFor(sheet.date); const sub = L[0]; if (sub) jbFill(f, sub); f.kind = v; render(); return; }
+      if (f.kind !== v && sheet.e == null){ const a = clockMinUI(f.start); f.end = fmt(a + (({ meal:60, rest:10, travel:20, study:60, event:60 })[v] || 30)); } f.kind = v; render(); return; }
+    case 'addjbsub': { readAdd(); const sub = EX.subjects.find(x => x.id === v); if (sub) jbFill(sheet.form, sub); render(); return; }
+    case 'addjbacad': { readAdd(); const a = jbAcads().find(x => x.name === v), f = sheet.form; if (a){ f.name = a.name; f.place = a.place; if (a.start && a.end){ f.start = a.start; f.end = a.end; } } render(); return; }
     case 'addtag': readAdd(); sheet.form.tag = v; render(); return;
     case 'addat': { readAdd(); const f = sheet.form, a = clockMinUI(f.start), z = clockMinUI(f.end); let dur = z > a ? z - a : ({ meal:60, rest:10, travel:20, study:60, event:60 })[f.kind] || 30;
       const s0 = +v; f.start = fmt(s0); f.end = fmt(s0 + dur); render(); return; }
     case 'addmode': readAdd(); sheet.form.mode = v; if (!sheet.form.min) sheet.form.min = 60; render(); return;
     case 'addmin': readAdd(); sheet.form.min = Math.max(10, Math.min(180, (sheet.form.min || 60) + +t.dataset.n)); render(); return;
     case 'addsave': { readAdd(); const f = sheet.form, name = f.name.trim() || ({ meal:'저녁', rest:'쉬기', study:'공부', travel:'이동', event:'일정' })[f.kind];
+      if (f.kind === 'jikbo'){ if (!f.sid){ toast('시험 과목을 골라 주세요'); return; } if (!f.start || !f.end || clockMinUI(f.end) <= clockMinUI(f.start)){ toast('시간을 확인해 주세요'); return; }
+        const nm0 = f.name.trim(), sub = EX.subjects.find(x => x.id === f.sid), jn = /직보$/.test(nm0) ? nm0 : (nm0 || (sub ? sub.name : '')) + ' 직보';
+        setDay(sheet.date, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:jn, start:f.start, end:f.end, place:f.place || 'daechi', travel:0, kind:'event', jikbo:f.sid }); });
+        toast(jn + ' 넣었습니다'); sheet = sheet.prev && sheet.prev.type === 'day' ? sheet.prev : null; render(); return; }
       if (f.kind === 'meal' && f.mode === 'flex'){ const dd = sheet.date, r = placeMeal(dd, name, f.min || 60, sheet.s);
         if (!r){ toast('넣을 공부 칸이 없습니다'); return; }
         toast(name + ' ' + durShort(f.min || 60) + ' 넣었습니다'); sheet = sheet.prev && (sheet.prev.type === 'day' || sheet.prev.type === 'fit' || sheet.prev.type === 'blk') ? sheet.prev : null; render(); return; }
@@ -3326,6 +3396,7 @@ document.addEventListener('click', e => {
   inp.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.isComposing){ ev.preventDefault(); commit(true); } else if (ev.key === 'Escape'){ ev.preventDefault(); ev.stopPropagation(); commit(false); } });
   inp.addEventListener('blur', () => commit(true));
 }, true);
+document.addEventListener('change', e => { if (sheet && sheet.type === 'add' && /^ad-(s|e)$/.test(e.target.id || '')){ readAdd(); render(); } });
 /* 컴퓨터: 단축키 */
 document.addEventListener('keydown', e => {
   const tg = e.target, typing = tg && (/INPUT|TEXTAREA|SELECT/.test(tg.tagName) || tg.isContentEditable);
@@ -4036,6 +4107,9 @@ function viewExam(){
 const jbList = sid => { const out = []; const s = EX.subjects.find(x => x.id === sid); if (!s) return out;
   for (let i = 1; i <= 10; i++){ const d = addDays(s.date, -i); for (const x of (getDay(d).extra || [])) if (x.jikbo === sid) out.push({ d, x }); }
   return out.sort((a, b) => a.d < b.d ? -1 : 1); };
+/* 이 날 직보를 넣을 수 있는 시험: 이 날 뒤 7일 안에 보는 과목 (내일 보는 과목이 먼저) */
+function jbSubjectsFor(date){ if (!EX) EX = defaultExam(); return exSorted().filter(x => x.date > date && dayDiff(date, x.date) <= 7); }
+function jbFill(f, sub){ const g = jbGuess(sub); f.sid = sub.id; if (g){ f.name = g.name; f.place = g.place; if (g.start && g.end){ f.start = g.start; f.end = g.end; } } else if (!f.place || f.place === 'home') f.place = 'daechi'; }
 function jbRow(s){
   const L = jbList(s.id);
   return `<div class="jbrow">${L.map(({ d, x }) => `<button class="jbchip" data-act="openacad" data-k="x:${x.id}" data-d="${d}"><b>직보</b> ${shortDate(d)} ${x.start}–${x.end}${x.name && !/^직보$/.test(x.name) ? ' · ' + esc(x.name.replace(/\s*직보$/, '')) : ''}</button>`).join('')}<button class="jbadd" data-act="exjbnew" data-s="${s.id}">+ 학원 직보</button></div>`;
