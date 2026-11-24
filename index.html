@@ -1122,8 +1122,10 @@ function buildDay(S, date, D){
   if (loc !== 'home'){
     const tr = backTr(locEv, travelHome(S, loc, locEv, transport)), L = leaveOf(locEv);
     if (L != null && L > t){ fillFree(ctx, 'away', t, L, { place:placeLabel(loc, locEv) }); t = L; }
-    push({ s:t, e:t+tr, label:'귀가' + (loc === 'daechi' ? (transport === 'taxi' ? ' (택시)' : ' (버스)') : ''), type:'travel', tev:locEv ? (locEv.extra ? 'x:' + locEv.id : locEv.id) : null, tplace:loc });
-    t += tr;
+    /* 귀가는 마음대로 넣지 않고 물어본다(시간표에 '+ 귀가' 버튼). 교회처럼 오가는 시간을 정해 둔 곳만 자동으로 넣는다. */
+    const fixedBack = loc === 'other' || (locEv && locEv.travelBack != null);
+    if (fixedBack){ push({ s:t, e:t+tr, label:'귀가' + (loc === 'daechi' ? (transport === 'taxi' ? ' (택시)' : ' (버스)') : ''), type:'travel', tev:locEv ? (locEv.extra ? 'x:' + locEv.id : locEv.id) : null, tplace:loc }); t += tr; }
+    else if (tr > 0) ctx.askHome = { s:t, n:tr, from:loc, label:'귀가' + (loc === 'daechi' ? (transport === 'taxi' ? ' (택시)' : ' (버스)') : '') };
   }
   if (t >= sleep - 20) warnings.push('집에 오면 바로 잘 시간입니다');
   fillFree(ctx, 'home', t, sleep, { final:true });
@@ -1150,7 +1152,7 @@ function buildDay(S, date, D){
     if (['study','memo','review'].includes(b.type)){ studyMin += b.e - b.s; if (b.tag === 'my') myMin += b.e - b.s; }
   }
   const lastSchool = anchors.find(a => a.kind === 'school');
-  return { date, dow, blocks:ctx.blocks, warnings, trims, studyMin, myMin, isSchool, yaja, transport, gapMode,
+  return { date, dow, blocks:ctx.blocks, askHome:ctx.askHome || null, warnings, trims, studyMin, myMin, isSchool, yaja, transport, gapMode,
     leave: lastSchool ? lastSchool.leave : null, events: dayEvents(S, date, D), wake, sleep, target: D.myTarget != null ? +D.myTarget : (+((S.myTarget||[])[dow]) || 0) };
 }
 
@@ -1284,7 +1286,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "c0d4a5062921";
+const BUILD = "ce4e1da6fe05";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -2917,7 +2919,7 @@ document.addEventListener('click', e => {
     case 'opentimes': openSheet({ type:'times' }); return;
     case 'sheetclose': sheet = null; render(); return;
     case 'sheetsave': sheetSave(); return;
-    case 'addtr': { const a = +t.dataset.s, n = +t.dataset.n; setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:'이동', start:fmt(a), end:fmt(a + n), kind:'travel', place:'here' }); }); toast(fmt(a) + '–' + fmt(a + n) + ' 이동 넣었습니다'); return; }
+    case 'addtr': { const a = +t.dataset.s, n = +t.dataset.n, nm = t.dataset.l || '이동'; setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:nm, start:fmt(a), end:fmt(a + n), kind:'travel', place:'here' }); }); toast(fmt(a) + '–' + fmt(a + n) + ' ' + nm + ' 넣었습니다'); return; }
     case 'opentrim': openSheet({ type:'trim', date:d, i:+t.dataset.i }); return;
     case 'sheetcancel': sheetCancel(); return;
     case 'sheetback': if (sheet && sheet.prev){ sheet = sheet.prev; renderSheet.back = true; render(); } return;
@@ -3898,8 +3900,11 @@ function dayCalHTML(R, date, isToday){
     const pl = a.type === 'school' ? 'school' : (a.ev && a.ev.place) || 'other';
     if (pl === 'home' || n.type === 'travel' || !STUDYT.includes(n.type) || /^seg:/.test(n.key || '') || /^자습/.test(n.label)) continue;
     const m = travelBetween(S, pl, 'home', null, a.ev || null, R.transport) || 10, yy = yOf(a.e);
-    if (yy != null) h += `<button class="dmv" data-act="addtr" data-d="${date}" data-s="${a.e}" data-n="${m}" style="top:${yy}px">+ 이동 ${durShort(m)}</button>`;
+    if (yy != null && !(R.askHome && R.askHome.s === a.e)) h += `<button class="dmv" data-act="addtr" data-d="${date}" data-s="${a.e}" data-n="${m}" style="top:${yy}px">+ 이동 ${durShort(m)}</button>`;
   }
+  /* 학교·학원 끝나고 집에 가는 길: 넣을지 물어본다 */
+  if (R.askHome){ const A = R.askHome, has = R.blocks.some(b => b.type === 'travel' && b.s < A.s + A.n && b.e > A.s), yy = yOf(A.s);
+    if (!has && yy != null) h += `<button class="dmv" data-act="addtr" data-d="${date}" data-s="${A.s}" data-n="${A.n}" data-l="귀가" style="top:${yy}px">+ 귀가 ${durShort(A.n)}</button>`; }
   const sy = yOf(R.sleep); if (sy != null) h += `<div class="dhr sleep" style="top:${sy}px"><span>${fmt(R.sleep)}</span><em>취침</em></div>`;
   if (isToday){ const ny = yOf(nm); if (ny != null) h += `<div class="dnow" style="top:${ny}px"><span>${fmt(nm)}</span></div>`; }
   return `<div class="dcal" style="height:${y + 22}px">${h}</div>`;
