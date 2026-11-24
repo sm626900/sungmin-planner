@@ -1319,7 +1319,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "03f91f2f46b7";
+const BUILD = "7ca23d7f1aa5";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -2170,10 +2170,9 @@ function viewToday(){
   if (unset.length) h += `<div class="banner info tap" data-act="openweekly">${IC.info}<div>${unset.map(esc).join(', ')} 시간이 비어 있습니다 <span style="color:var(--tint)">넣기 ›</span></div></div>`;
   for (const w of R.warnings) h += banner(esc(w));
   /* 시험 기간: 곧 볼 시험의 학원 직보를 이 날에 바로 넣는다 */
-  if (typeof jbSubjectsFor === 'function'){ const J = jbSubjectsFor(cur).slice(0, 4);
-    if (J.length){ const mine = (D.extra || []).filter(x => x.jikbo);
-      h += `<div class="jbday"><div class="jbh">시험 직보</div>${J.map(x => { const n = dayDiff(cur, x.date), have = mine.filter(m => m.jikbo === x.id);
-        return `<div class="jbl" style="--c:${x.color}"><span class="jbn"><b>${esc(x.name)}</b><small>${n === 1 ? '내일' : n + '일 뒤'} · ${shortDate(x.date)} ${x.per}</small></span>${have.map(m => `<button class="jbchip" data-act="openacad" data-k="x:${m.id}" data-d="${cur}"><b>직보</b> ${m.start}–${m.end}</button>`).join('')}<button class="jbadd" data-act="openadd" data-d="${cur}" data-kind="jikbo" data-sid="${x.id}">+ 직보</button></div>`; }).join('')}</div>`; } }
+  if (typeof jbSubjectsFor === 'function'){ const done = new Set((D.extra || []).filter(x => x.jikbo).map(x => x.jikbo)), J = jbSubjectsFor(cur).filter(x => !done.has(x.id));
+    if (J.length) h += `<div class="jbday"><div class="jbh">시험 직전보충</div>${J.map(x => { const n = dayDiff(cur, x.date);
+        return `<div class="jbl" style="--c:${x.color}"><span class="jbn"><b>${esc(x.name)}</b><small>${n === 1 ? '내일' : DAYS[dowOf(x.date)] + '요일'} ${shortDate(x.date)} ${x.per} 시험</small></span><button class="jbadd" data-act="openadd" data-d="${cur}" data-kind="jikbo" data-sid="${x.id}">+ 직보 추가</button></div>`; }).join('')}</div>`; }
   for (const q of travelAsks(R, D)) h += `<div class="banner info">${IC.info}<div><b>${fmt(q.s)} ${esc(q.from)} → 집</b> 가는 이동이 없습니다. ${durShort(q.n)} 걸립니다.<div class="mbtns"><button class="ci" style="color:var(--tint)" data-act="addtr" data-d="${cur}" data-s="${q.s}" data-n="${q.n}" data-l="${q.label}">${fmt(q.s)}–${fmt(q.s + q.n)} ${q.label} 넣기</button><button class="ci" data-act="noask" data-d="${cur}" data-s="${q.s}">안 넣기</button></div></div></div>`;
   (R.trims || []).forEach((t, i) => { const w = /^이동|^귀가|^등교/.test(t.with) ? '이동 시간' : t.with;
     h += `<div class="banner tap" data-act="opentrim" data-d="${cur}" data-i="${i}">${IC.warn}<div><b>${esc(t.label)} ${fmt(t.from[0])}–${fmt(t.from[1])}</b>${josa(t.label, '이', '가')} ${esc(w)}${josa(w, '과', '와')} ${t.to ? '일부' : '완전히'} 겹칩니다 <span style="color:var(--tint);white-space:nowrap">자세히 보기 ›</span></div></div>`; });
@@ -4108,7 +4107,17 @@ const jbList = sid => { const out = []; const s = EX.subjects.find(x => x.id ===
   for (let i = 1; i <= 10; i++){ const d = addDays(s.date, -i); for (const x of (getDay(d).extra || [])) if (x.jikbo === sid) out.push({ d, x }); }
   return out.sort((a, b) => a.d < b.d ? -1 : 1); };
 /* 이 날 직보를 넣을 수 있는 시험: 이 날 뒤 7일 안에 보는 과목 (내일 보는 과목이 먼저) */
-function jbSubjectsFor(date){ if (!EX) EX = defaultExam(); return exSorted().filter(x => x.date > date && dayDiff(date, x.date) <= 7); }
+/* 이 날 직보를 넣을 과목:
+   평일 → 바로 다음 날 시험 과목만 (12/1엔 12/2 수학만)
+   시험 기간 중 주말 → 다음 주(월–금)에 보는 과목 (토·일에 12/7·12/8 과목) */
+function jbSubjectsFor(date){
+  if (!EX) EX = defaultExam();
+  const L = exSorted().filter(x => x.date > date); if (!L.length) return [];
+  const dow = dowOf(date);
+  const first = exSorted()[0].date;
+  if ((dow === 6 || dow === 0) && date > first){ const mon = addDays(date, dow === 6 ? 2 : 1), fri = addDays(mon, 4); return L.filter(x => x.date >= mon && x.date <= fri); }
+  const next = addDays(date, 1); return L.filter(x => x.date === next);
+}
 function jbFill(f, sub){ const g = jbGuess(sub); f.sid = sub.id; if (g){ f.name = g.name; f.place = g.place; if (g.start && g.end){ f.start = g.start; f.end = g.end; } } else if (!f.place || f.place === 'home') f.place = 'daechi'; }
 function jbRow(s){
   const L = jbList(s.id);
