@@ -1074,10 +1074,12 @@ function buildDay(S, date, D){
 }
 
 const PROTECT = ['acad','travel','wake'];
+/* 앱이 자동으로 만든 이동 칸. 직접 넣은 일정과 겹치면 직접 넣은 쪽이 이긴다. */
+const autoTr = b => b.type === 'travel' && !b.custom && /^tr:/.test(b.key || '');
 function cutAround(blocks, O){
   const out = [];
   for (const b of blocks){
-    if (b.marker || PROTECT.includes(b.type) || b.key === 'seg:학교 수업' || b.e <= O.s || b.s >= O.e){ out.push(b); continue; }
+    if (b.marker || (PROTECT.includes(b.type) && !(O.custom && autoTr(b))) || b.key === 'seg:학교 수업' || b.e <= O.s || b.s >= O.e){ out.push(b); continue; }
     if (b.s < O.s) out.push({ ...b, e:O.s });
     if (b.e > O.e) out.push({ ...b, s:O.e, key:(b.key || 'b') + '+' });
   }
@@ -1113,7 +1115,7 @@ function applyOverlays(blocks, D, wake, sleep, isSchool){
   for (const O0 of overlays){
     let O = O0;
     if (O.custom && O.cx){
-      const hard = out.filter(b => !b.marker && (PROTECT.includes(b.type) || b.key === 'seg:학교 수업') && b.s < O.e && b.e > O.s).sort((a, b) => a.s - b.s);
+      const hard = out.filter(b => !b.marker && ((PROTECT.includes(b.type) && !autoTr(b)) || b.key === 'seg:학교 수업') && b.s < O.e && b.e > O.s).sort((a, b) => a.s - b.s);
       if (hard.length){
         const pcs = []; let c = O.s;
         for (const h of hard){ if (h.s > c) pcs.push([c, Math.min(h.s, O.e)]); c = Math.max(c, h.e); }
@@ -1200,7 +1202,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "696b38d547f8";
+const BUILD = "12d52faeb5fd";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -2302,7 +2304,8 @@ function blkSheetHTML(st){
 
     body += taskSec;
 
-    body += grp('', putOther + (D.seg && D.seg[lb] ? `<button class="rw tap add" data-act="undo" data-d="${st.date}" data-k="seg:${esc(lb)}"><div class="mid"><div class="tt">원래대로</div></div></button>` : ''));
+    body += grp('', putOther + (D.seg && D.seg[lb] ? `<button class="rw tap add" data-act="undo" data-d="${st.date}" data-k="seg:${esc(lb)}"><div class="mid"><div class="tt">원래대로</div></div></button>` : '')
+      + (['rest','meal'].includes(b.type) && !o.study ? `<button class="rw tap danger" data-act="bsegdel" ${dA}><div class="mid"><div class="tt">지우기</div><div class="st">이 시간은 공부 시간이 됩니다</div></div></button>` : ''));
   } else if (st.key === 'lunch'){
     body = head(fmt(b.s) + '–' + fmt(b.e)) + grp('점심', timeRow('blunch', fmt(b.s), fmt(b.e)) + `<div class="rw"><div class="mid"><div class="tt">점심 빼고 공부하기</div></div>${sw(false,'bnolunch',dA)}</div>`, '시간을 바꾸면 그 시간에 점심이 들어가.');
   } else if (st.key.startsWith('cx:')){
@@ -2333,11 +2336,11 @@ function blkSheetHTML(st){
         body += grp('대치 이동', `<div class="rw"><div class="mid"><div class="tt">택시 타기</div><div class="st">버스 ${S.busMin}분 · 택시 ${S.taxiMin}분</div></div>${sw(R.transport === 'taxi','trans',`data-d="${st.date}"`)}</div>` + (big ? `<div class="rw"><div class="mid"><div class="tt">학원 사이에 집 들렀다 가기</div></div>${sw(R.gapMode === 'home','gap',`data-d="${st.date}"`)}</div>` : '')
           + `<button class="rw tap add" data-act="opentimes"><div class="mid"><div class="tt">버스 · 택시 시간 바꾸기</div><div class="st">매주 적용</div></div>${IC.chv}</button>`);
       } else body += grp('', `<button class="rw tap add" data-act="opentimes"><div class="mid"><div class="tt">이동 시간 바꾸기</div><div class="st">학교 ${S.schoolMin}분 · 매주 적용</div></div>${IC.chv}</button>`);
-      body += taskSec;
+      body += taskSec + grp('', `<button class="rw tap danger" data-act="blkhide" data-msg="지웠습니다" ${dA}><div class="mid"><div class="tt">지우기</div><div class="st">이 날만 지웁니다</div></div></button>`);
     }
   } else if (st.key.startsWith('gap:')){
     body = head(fmt(b.s) + '–' + fmt(b.e)) + `<div class="sf" style="padding:0 16px 14px">일정을 바꿔서 생긴 쉬는 시간입니다.</div>`
-      + grp('', `<button class="rw tap" data-act="gapstudy" ${dA} data-s="${b.s}" data-e="${b.e}"><div class="mid"><div class="tt">공부 시간으로 바꾸기</div></div></button>` + putOther);
+      + grp('', putOther + `<button class="rw tap danger" data-act="gapstudy" ${dA} data-s="${b.s}" data-e="${b.e}"><div class="mid"><div class="tt">지우기</div><div class="st">이 시간은 공부 시간이 됩니다</div></div></button>`);
   } else {
     body = head(fmt(b.s) + '–' + fmt(b.e));
     body += grp('시간', timeRow('bblktime', fmt(b.s), fmt(b.e)) + ((D.blk || {})[st.key] || Object.keys(D.blk || {}).some(k => (b.members || [b.s]).some(m => k === st.key.replace(/:\d+\+?$/, ':') + m)) ? `<button class="rw tap add" data-act="blkreset" ${dA}><div class="mid"><div class="tt">원래대로</div></div></button>` : ''), '줄이거나 옮기면 비는 시간은 쉬는 시간이 됩니다.');
@@ -2792,7 +2795,8 @@ document.addEventListener('click', e => {
       toast(fmt(a) + ' ' + nm2 + ' ' + durShort(+n) + ' 넣었습니다'); return; }
     case 'gapstudy': { const a = +t.dataset.s, z = +t.dataset.e; setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:'공부', start:fmt(a), end:fmt(z), kind:'study', tag:'hw', place:'here' }); }); sheet = null; render(); toast('공부 시간으로 바꿨습니다'); return; }
     case 'blkstudy': { const k = t.dataset.k, { b } = findBlock(d, k); if (!b) return; const keys = blkKeysOf(d, k); setDay(d, D => { D.blk = D.blk || {}; for (const kk of keys) D.blk[kk] = { toStudy:true }; }); sheet = null; render(); toast(b.label + ' 지웠습니다'); return; }
-    case 'blkhide': { const k = t.dataset.k, keys = blkKeysOf(d, k); setDay(d, D => { D.blk = D.blk || {}; for (const kk of keys) D.blk[kk] = { hide:true }; }); sheet = null; render(); toast('칸을 비웠습니다'); return; }
+    case 'blkhide': { const k = t.dataset.k, keys = blkKeysOf(d, k); setDay(d, D => { D.blk = D.blk || {}; for (const kk of keys) D.blk[kk] = { hide:true }; }); sheet = null; render(); toast(t.dataset.msg || '칸을 비웠습니다'); return; }
+    case 'bsegdel': { const lb = segLabel(t.dataset.k); setDay(d, D => { D.seg = D.seg || {}; D.seg[lb] = { ...(D.seg[lb] || {}), study:true }; }); sheet = null; render(); toast(lb + ' 지웠습니다'); return; }
     case 'tdel': { const tk = t.dataset.tk, dd = d;
       if (tk.startsWith('t:')){ const id = tk.slice(2); setDay(dd, D => { D.todos = (D.todos || []).filter(x => x.id !== id); }); }
       else if (tk.startsWith('r:')) setDay(dd, D => { D.skipMy = D.skipMy || {}; D.skipMy[tk.slice(2)] = true; });
