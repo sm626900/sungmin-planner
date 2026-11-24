@@ -886,6 +886,8 @@ html.desk .msr-a:hover{background:color-mix(in srgb,var(--fill) 60%,transparent)
 .tlx{position:relative;height:18px;margin-left:68px}
 .tlx span{position:absolute;top:0;transform:translateX(-50%);font-size:10.5px;color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
 .tlx span i{display:block;width:1px;height:4px;background:var(--sep);margin:0 auto 2px}
+.dmv{position:absolute;right:14px;transform:translateY(-50%);z-index:3;border:0;font-size:11.5px;font-weight:600;color:var(--pink);background:color-mix(in srgb,var(--pink) 14%,var(--card));border:1px dashed color-mix(in srgb,var(--pink) 55%,transparent);border-radius:999px;padding:3px 10px;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+html.desk .dmv:hover{background:color-mix(in srgb,var(--pink) 22%,var(--card))}
 /* ===== 컴퓨터 화면 (html.desk) ===== */
 html.desk body{padding-left:228px}
 html.desk .wrap{padding:22px 32px 48px}
@@ -957,7 +959,7 @@ function defaultSettings(){
     v:1,
     wakeWeekday:'06:30', wakeWeekend:'09:00', prepMin:40,
     sleep:['00:30','01:30','01:30','01:30','01:30','01:30','01:00'],
-    schoolMin:10, busMin:60, taxiMin:30, washMin:20, studyLen:50, breakLen:10,
+    schoolMin:10, homeMin:20, busMin:60, taxiMin:30, washMin:20, studyLen:50, breakLen:10,
     defaultTransport:'bus', satGapDefault:'stay',
     yajaDefault:['full','full','full','full','full','full','full'],
     myTarget:[180,60,150,150,150,150,60],
@@ -985,10 +987,12 @@ function travelTo(S, place, ev, transport){
   if (place === 'home') return 0;
   return +(ev && ev.travel) || 0;
 }
+/* 집으로 가는 길: 학교(학교 앞 학원 포함) → 집은 따로 정한 시간(기본 20분) */
+function travelHome(S, from, fromEv, transport){ return from === 'school' ? (+S.homeMin || 20) : travelTo(S, from, fromEv, transport); }
 function travelBetween(S, from, to, ev, fromEv, transport){
   if (from === to) return 0;
   if (from === 'home') return travelTo(S, to, ev, transport);
-  if (to === 'home') return travelTo(S, from, fromEv, transport);
+  if (to === 'home') return travelHome(S, from, fromEv, transport);
   return Math.max(travelTo(S, to, ev, transport), 10);
 }
 function placeLabel(place, ev){ return place === 'other' ? ((ev && ev.placeName) || '기타') : PLACES[place] || place; }
@@ -1116,7 +1120,7 @@ function buildDay(S, date, D){
     t = Math.max(t, A.e); loc = A.place; locEv = A.ev || null;
   }
   if (loc !== 'home'){
-    const tr = backTr(locEv, travelTo(S, loc, locEv, transport)), L = leaveOf(locEv);
+    const tr = backTr(locEv, travelHome(S, loc, locEv, transport)), L = leaveOf(locEv);
     if (L != null && L > t){ fillFree(ctx, 'away', t, L, { place:placeLabel(loc, locEv) }); t = L; }
     push({ s:t, e:t+tr, label:'귀가' + (loc === 'daechi' ? (transport === 'taxi' ? ' (택시)' : ' (버스)') : ''), type:'travel', tev:locEv ? (locEv.extra ? 'x:' + locEv.id : locEv.id) : null, tplace:loc });
     t += tr;
@@ -1280,7 +1284,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "54483c90819b";
+const BUILD = "c0d4a5062921";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -2521,7 +2525,7 @@ function blkSheetHTML(st){
         let big = false; for (let i = 1; i < dv.length; i++) if (toMin(dv[i].start) - toMin(dv[i-1].end) >= 120) big = true;
         body += grp('대치 이동', `<div class="rw"><div class="mid"><div class="tt">택시 타기</div><div class="st">버스 ${S.busMin}분 · 택시 ${S.taxiMin}분</div></div>${sw(R.transport === 'taxi','trans',`data-d="${st.date}"`)}</div>` + (big ? `<div class="rw"><div class="mid"><div class="tt">학원 사이에 집 들렀다 가기</div></div>${sw(R.gapMode === 'home','gap',`data-d="${st.date}"`)}</div>` : '')
           + `<button class="rw tap add" data-act="opentimes"><div class="mid"><div class="tt">버스 · 택시 시간 바꾸기</div><div class="st">매주 적용</div></div>${IC.chv}</button>`);
-      } else body += grp('', `<button class="rw tap add" data-act="opentimes"><div class="mid"><div class="tt">이동 시간 바꾸기</div><div class="st">학교 ${S.schoolMin}분 · 매주 적용</div></div>${IC.chv}</button>`);
+      } else body += grp('', `<button class="rw tap add" data-act="opentimes"><div class="mid"><div class="tt">이동 시간 바꾸기</div><div class="st">집 → 학교 ${S.schoolMin}분 · 학교 → 집 ${S.homeMin || 20}분 · 매주 적용</div></div>${IC.chv}</button>`);
       body += taskSec + grp('', `<button class="rw tap danger" data-act="blkhide" data-msg="지웠습니다" ${dA}><div class="mid"><div class="tt">지우기</div><div class="st">이 날만 지웁니다</div></div></button>`);
     }
   } else if (st.key.startsWith('gap:')){
@@ -2849,7 +2853,7 @@ function timesSheetHTML(){
   const sl = (k, l) => `<div class="rw"><div class="mid"><div class="tt">${l}</div></div><input type="time" data-act="sleepg" data-k="${k}" value="${k === 'wd' ? S.sleep[1] : S.sleep[+k]}"></div>`;
   return grp('잠', tm('wakeWeekday','평일 기상') + sl('wd','평일 취침') + sl('6','토요일 취침') + sl('0','일요일 취침'))
     + grp('쉬는 시간', num('breakLen','기본 길이', 5), '쉬는 시간은 자동으로 넣지 않고, 오늘 화면에서 고를 때 이 길이로 들어갑니다.')
-    + grp('이동', num('schoolMin','학교 ↔ 집') + num('busMin','대치 버스') + num('taxiMin','대치 택시'));
+    + grp('이동', num('schoolMin','집 → 학교') + num('homeMin','학교 → 집') + num('busMin','대치 버스') + num('taxiMin','대치 택시'), '학교 앞 학원에서 집으로 올 때도 \'학교 → 집\' 시간을 씁니다.');
 }
 
 /* ===== 동작 ===== */
@@ -2913,6 +2917,7 @@ document.addEventListener('click', e => {
     case 'opentimes': openSheet({ type:'times' }); return;
     case 'sheetclose': sheet = null; render(); return;
     case 'sheetsave': sheetSave(); return;
+    case 'addtr': { const a = +t.dataset.s, n = +t.dataset.n; setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:'이동', start:fmt(a), end:fmt(a + n), kind:'travel', place:'here' }); }); toast(fmt(a) + '–' + fmt(a + n) + ' 이동 넣었습니다'); return; }
     case 'opentrim': openSheet({ type:'trim', date:d, i:+t.dataset.i }); return;
     case 'sheetcancel': sheetCancel(); return;
     case 'sheetback': if (sheet && sheet.prev){ sheet = sheet.prev; renderSheet.back = true; render(); } return;
@@ -3884,6 +3889,16 @@ function dayCalHTML(R, date, isToday){
     h += `<div class="dev ${now ? 'on' : ''} ${muted ? 'mu' : ''} ${pastB ? 'past' : ''}" ${act} ${drop} style="--c:${c};top:${s.y + 1}px;height:${s.h - 2}px">
       <div class="dtop"><b>${esc(b.label)}</b><span class="dmeta">${fmt(b.s)}–${fmt(b.e)} · ${durShort(b.e - b.s)}${ovMin ? ` · <em class="ovm">${durShort(ovMin)} 넘침</em>` : ''}</span>${blkCheck(date, b)}</div>
       <div class="dtime">${fmt(b.s)} – ${fmt(b.e)}${now ? ' · 지금' : ''}</div>${chips}</div>`;
+  }
+  /* 학교·학원이 끝나고 바로 집 공부인데 이동이 없으면: 작은 '+ 이동' (누르면 알맞은 시간으로 들어간다) */
+  for (let i = 0; i < blocks.length - 1; i++){
+    const a = blocks[i]; let j = i + 1; while (j < blocks.length - 1 && /^gap:/.test(blocks[j].key || '')) j++;   /* 이동이 빠져 생긴 빈 쉬는 시간은 건너뛴다 */
+    const n = blocks[j];
+    if (!(a.type === 'school' || a.type === 'acad') || blocks[i + 1].s !== a.e) continue;
+    const pl = a.type === 'school' ? 'school' : (a.ev && a.ev.place) || 'other';
+    if (pl === 'home' || n.type === 'travel' || !STUDYT.includes(n.type) || /^seg:/.test(n.key || '') || /^자습/.test(n.label)) continue;
+    const m = travelBetween(S, pl, 'home', null, a.ev || null, R.transport) || 10, yy = yOf(a.e);
+    if (yy != null) h += `<button class="dmv" data-act="addtr" data-d="${date}" data-s="${a.e}" data-n="${m}" style="top:${yy}px">+ 이동 ${durShort(m)}</button>`;
   }
   const sy = yOf(R.sleep); if (sy != null) h += `<div class="dhr sleep" style="top:${sy}px"><span>${fmt(R.sleep)}</span><em>취침</em></div>`;
   if (isToday){ const ny = yOf(nm); if (ny != null) h += `<div class="dnow" style="top:${ny}px"><span>${fmt(nm)}</span></div>`; }
