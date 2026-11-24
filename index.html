@@ -1352,7 +1352,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "8b31b00f9d63";
+const BUILD = "ea956c1493de";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -3152,7 +3152,9 @@ document.addEventListener('click', e => {
       return; }
     case 'noask': { const a = +t.dataset.s; setDay(d, D => { D.noAsk = Object.assign({}, D.noAsk, { [a]:true }); }); toast('이 날은 묻지 않습니다'); return; }
     case 'addtr': { const a = +t.dataset.s, n = +t.dataset.n, nm = t.dataset.mode ? '귀가' + modeTag(t.dataset.mode) : (t.dataset.l || '이동').replace(/ 넣기$/, ''); const fr = t.dataset.from, md = t.dataset.mode || undefined; setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:nm, start:fmt(a), end:fmt(a + n), kind:'travel', place:'here', ...(fr ? { from:fr, to:'home', mode:md } : {}) }); }); toast(fmt(a) + '–' + fmt(a + n) + ' ' + nm + ' 넣었습니다'); return; }
-    case 'delask': openSheet({ type:'fill', date:d, key:t.dataset.k, prev:null }); return;
+    case 'delask': { /* 묻지 않고 바로 지운다: 지운 자리는 쉬는 시간, 쉬는 시간을 지우면 빈 시간 */
+      const { b } = findBlock(d, t.dataset.k); if (!b) return;
+      fillGo({ date:d, key:t.dataset.k }, b.type === 'rest' ? 'free' : 'rest'); return; }
     case 'fillgo': fillGo(sheet, v); return;
     case 'opentrim': openSheet({ type:'trim', date:d, i:+t.dataset.i }); return;
     case 'sheetcancel': sheetCancel(); return;
