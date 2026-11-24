@@ -442,7 +442,8 @@ body.dragmode .ti[data-drop]{outline:1.5px dashed color-mix(in srgb,var(--c) 45%
 .tk.holding{transform:scale(.96);background:var(--fill)}
 .tk.dragsrc{opacity:.25;transform:scale(.97)}
 .tk.ghost{position:fixed;z-index:90;pointer-events:none;will-change:transform;background:var(--card);padding:7px 11px;border-radius:12px;font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.08);transition:box-shadow .25s ease}
-.tk.ghost.up{box-shadow:0 18px 40px rgba(0,0,0,.22),0 4px 10px rgba(0,0,0,.08)}
+.tk.ghost.up{box-shadow:0 18px 40px rgba(0,0,0,.22),0 4px 10px rgba(0,0,0,.08);opacity:.94}
+.tk.ghost{transition:box-shadow .25s ease,opacity .2s}
 .tk.ghost.land{transition:transform .22s cubic-bezier(.2,.8,.2,1),opacity .22s,box-shadow .22s;box-shadow:0 2px 6px rgba(0,0,0,.06)}
 .tk.landed{animation:landed .6s cubic-bezier(.34,1.56,.64,1)}
 @keyframes landed{0%{transform:scale(.85);background:color-mix(in srgb,var(--tint) 18%,transparent)}100%{transform:scale(1);background:transparent}}
@@ -848,6 +849,15 @@ html.desk .step span{cursor:text;border-radius:6px}
 html.desk .step span:hover{background:var(--fill)}
 .step input.stin{width:72px;border:0;background:var(--card);color:var(--text);text-align:center;font:inherit;font-size:14px;padding:4px 2px;border-radius:6px;outline:2px solid var(--tint)}
 .dcal .tk.slot.meal{--c:var(--brown);background:color-mix(in srgb,var(--brown) 14%,var(--card))}
+/* 끌어서 넣을 때: 들어갈 자리 줄 */
+#insline{position:fixed;left:0;top:0;height:2.5px;border-radius:2px;background:var(--c,var(--tint));z-index:91;pointer-events:none;opacity:0;transition:transform .14s cubic-bezier(.2,.8,.2,1),opacity .15s,width .14s;box-shadow:0 0 0 1px color-mix(in srgb,var(--card) 70%,transparent)}
+#insline.on{opacity:1}
+#insline i{position:absolute;left:-6px;top:50%;width:9px;height:9px;margin-top:-6.5px;border-radius:50%;border:2.5px solid var(--c,var(--tint));background:var(--card)}
+#insline span{position:absolute;right:0;bottom:5px;font-size:11px;font-weight:700;letter-spacing:-.1px;color:#fff;background:var(--c,var(--tint));padding:3px 8px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18);font-variant-numeric:tabular-nums}
+body.dragmode .dev .tk.slot{transition:transform .18s cubic-bezier(.2,.8,.2,1)}
+.dev .tk.slot.shU{transform:translateY(-5px)}
+.dev .tk.slot.shD{transform:translateY(7px)}
+body.dragmode .dev.dropover{box-shadow:inset 0 0 0 1.5px var(--c)!important;background:color-mix(in srgb,var(--c) 16%,var(--card))!important}
 /* ===== 컴퓨터 화면 (html.desk) ===== */
 html.desk body{padding-left:228px}
 html.desk .wrap{padding:22px 32px 48px}
@@ -1241,7 +1251,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "4a94b3c57e49";
+const BUILD = "3972cca6f79d";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -3249,7 +3259,34 @@ document.addEventListener('focusout', e => {
 
 /* ===== 시간표에서 할 일 끌어서 옮기기 (꾹 누른 뒤 끌기, 부드럽게) ===== */
 (function(){
-  let st = null, ghost = null, over = null, overTk = null, suppress = false, raf = 0, px = 0, py = 0;
+  let st = null, ghost = null, over = null, overTk = null, suppress = false, raf = 0, px = 0, py = 0, ins = null, line = null;
+  /* 어디 사이에 들어가는지: 칸 안 할 일들 사이에 파란 줄(+시각)을 긋고, 앞뒤 할 일을 살짝 벌린다 */
+  const LIFT = 40;   /* 끄는 할 일은 손가락보다 조금 위에 떠 있게 (아래 들어갈 자리 줄이 보이도록) */
+  const slotsOf = blk => { const seen = new Set(); return [...blk.querySelectorAll('.tk.slot[data-tk]')].filter(c => c !== st.chip && c.dataset.tk !== st.chip.dataset.tk && !seen.has(c.dataset.tk) && seen.add(c.dataset.tk)); };
+  function clearShift(blk){ blk.querySelectorAll('.tk.slot.shU,.tk.slot.shD').forEach(c => c.classList.remove('shU', 'shD')); }
+  function hideLine(){ if (line) line.classList.remove('on'); }
+  function placeLine(){
+    if (!over || !over.classList.contains('dev') || !over.querySelector('.tks.slots, .dtop')){ ins = null; hideLine(); return; }
+    const chips = slotsOf(over), br = over.getBoundingClientRect();
+    let i = chips.findIndex(c => { const r = c.getBoundingClientRect(); return py < r.top + r.height / 2; }); if (i < 0) i = chips.length;
+    const nb = chips[i], pv = chips[i - 1];
+    let y, tm = '';
+    if (nb){ y = pv ? (pv.getBoundingClientRect().bottom + nb.getBoundingClientRect().top) / 2 : nb.getBoundingClientRect().top - 2; const t0 = nb.querySelector('.st0'); tm = t0 ? t0.textContent.trim() : ''; }
+    else if (pv){ y = pv.getBoundingClientRect().bottom; const fr = over.querySelector('.dfree span'); tm = fr ? (fr.textContent.match(/\d{1,2}:\d{2}/) || [''])[0] : ''; }
+    else { const h = over.querySelector('.dtop'); y = h ? h.getBoundingClientRect().bottom + 2 : br.top + 24; const ds = over.querySelector('.dmeta'); tm = ds ? (ds.textContent.match(/\d{1,2}:\d{2}/) || [''])[0] : ''; }
+    const key = (nb ? nb.dataset.tk : 'END') + '|' + over.dataset.drop;
+    if (!ins || ins.key !== key){
+      ins = { key, before: nb ? nb.dataset.tk : null };
+      chips.forEach((c, k) => { c.classList.toggle('shU', k < i && k === i - 1); c.classList.toggle('shD', k >= i && k === i); });
+      try { navigator.vibrate && navigator.vibrate(4); } catch(_){}
+    }
+    if (!line){ line = document.createElement('div'); line.id = 'insline'; line.innerHTML = '<i></i><span></span>'; document.body.appendChild(line); }
+    line.querySelector('span').textContent = tm ? tm + '부터' : '';
+    line.querySelector('span').style.display = tm ? '' : 'none';
+    const x = br.left + 8, w = br.width - 16;
+    line.style.width = w + 'px'; line.style.transform = `translate3d(${x}px,${Math.round(y) - 1}px,0)`;
+    line.classList.add('on'); line.style.setProperty('--c', getComputedStyle(over).getPropertyValue('--c') || 'var(--tint)');
+  }
   const pt = e => e.touches ? e.touches[0] : e;
   function begin(e){
     const chip = e.target.closest('.tk[data-tk]'); if (!chip) return;
@@ -3273,14 +3310,14 @@ document.addEventListener('focusout', e => {
   }
   function loop(){
     if (!st || !st.on) return;
-    ghost.style.transform = `translate3d(${px - st.dx}px,${py - st.dy}px,0) scale(1.05) rotate(-1.2deg)`;
+    ghost.style.transform = `translate3d(${px - st.dx}px,${py - st.dy - LIFT}px,0) scale(1.05) rotate(-1.2deg)`;
     const m = 90, H = window.innerHeight;
     if (py < m) window.scrollBy(0, -Math.ceil((m - py) / 6));
     else if (py > H - m - 50) window.scrollBy(0, Math.ceil((py - (H - m - 50)) / 6));
-    const el = document.elementFromPoint(px, py), tgt = el && el.closest('[data-drop]');
-    let tc = el && el.closest('.tk.slot[data-tk]'); if (tc === st.chip || (tc && !tgt)) tc = null;
-    if (overTk !== tc){ if (overTk) overTk.classList.remove('dropbefore'); overTk = tc; if (overTk) overTk.classList.add('dropbefore'); }
-    if (over !== tgt){ if (over) over.classList.remove('dropover'); over = tgt; if (over){ over.classList.add('dropover'); try { navigator.vibrate && navigator.vibrate(5); } catch(_){} } }
+    ghost.style.visibility = 'hidden'; const el = document.elementFromPoint(px, py); ghost.style.visibility = '';
+    const tgt = el && el.closest('[data-drop]');
+    if (over !== tgt){ if (over){ over.classList.remove('dropover'); clearShift(over); } over = tgt; ins = null; if (over){ over.classList.add('dropover'); try { navigator.vibrate && navigator.vibrate(5); } catch(_){} } }
+    placeLine();
     raf = requestAnimationFrame(loop);
   }
   function move(e){
@@ -3296,15 +3333,15 @@ document.addEventListener('focusout', e => {
     cancelAnimationFrame(raf);
     suppress = true; setTimeout(() => suppress = false, 400);
     const c = st.chip, tk = c.dataset.tk, from = c.dataset.from, d = c.dataset.d, to = over && over.dataset.drop;
-    const before = overTk && overTk.dataset.tk;
-    if (overTk) overTk.classList.remove('dropbefore');
-    const ok = to && (to !== from || before);
+    const before = ins ? ins.before : null, lineY = line && line.classList.contains('on') ? line.getBoundingClientRect().top : null;
+    hideLine(); if (over) clearShift(over);
+    const ok = to && (to !== from || ins);
     const order = ok ? [...new Set([...over.querySelectorAll('.tk[data-tk]')].map(n => n.dataset.tk))].filter(x => x !== tk) : [];
     if (ok){ const at = before ? order.indexOf(before) : -1; order.splice(at < 0 ? order.length : at, 0, tk); }
     const dest = ok ? ((before && over.querySelector(`.tk[data-tk="${CSS.escape(before)}"]`)) || over.querySelector('.tks') || over.querySelector('.nm') || over.querySelector('.dtop') || over) : c;
     const r = dest.getBoundingClientRect();
     ghost.classList.remove('up'); ghost.classList.add('land');
-    ghost.style.transform = `translate3d(${r.left}px,${ok && dest.classList.contains('tks') ? r.bottom - 18 : r.top}px,0) scale(${ok ? .9 : 1})`;
+    ghost.style.transform = `translate3d(${r.left}px,${ok && lineY != null ? lineY - 8 : ok && dest.classList.contains('tks') ? r.bottom - 18 : r.top}px,0) scale(${ok ? .9 : 1})`;
     ghost.style.opacity = ok ? '0' : '1';
     const g = ghost; ghost = null;
     if (over) over.classList.remove('dropover');
@@ -3314,7 +3351,7 @@ document.addEventListener('focusout', e => {
       if (ok){ setDay(d, D => { if (D.at) delete D.at[tk]; D.plan = D.plan || {}; D.plan[tk] = to; D.ord = D.ord || {}; order.forEach((x, i) => { D.ord[x] = i; }); }); const n = document.querySelector(`.tk[data-tk="${CSS.escape(tk)}"]`); if (n){ n.classList.add('landed'); setTimeout(() => n.classList.remove('landed'), 600); } }
       else render();
     }, 220);
-    over = null; overTk = null; st = null;
+    over = null; overTk = null; ins = null; st = null;
   }
   document.addEventListener('touchstart', begin, { passive:true });
   document.addEventListener('touchmove', move, { passive:false });
