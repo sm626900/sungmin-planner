@@ -870,6 +870,22 @@ html.desk .msr-a:hover{background:color-mix(in srgb,var(--fill) 60%,transparent)
 .jbchip{border:0;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--text);font-size:12.5px;padding:5px 10px;border-radius:999px;font-variant-numeric:tabular-nums}
 .jbchip b{color:var(--c);font-weight:700;margin-right:2px}
 .jbadd{border:0;background:none;color:var(--tint);font-size:12.5px;font-weight:600;padding:5px 4px}
+/* 겹침 자세히 */
+.trimwhy{padding:0 16px 14px;font-size:15px;line-height:1.5}
+.trimwhy b{font-weight:600}
+.tlv{background:var(--card);border-radius:12px;padding:14px 14px 8px;margin:0 0 14px}
+.tlr{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.tll{flex:none;width:58px;font-size:11.5px;color:var(--sub);text-align:right}
+.tlt{position:relative;flex:1;height:44px;background:var(--fill);border-radius:8px;overflow:hidden}
+.tlb{position:absolute;top:3px;bottom:3px;border-radius:6px;background:color-mix(in srgb,var(--c) 26%,var(--card));border-left:3px solid var(--c);padding:3px 6px;overflow:hidden;display:flex;flex-direction:column;justify-content:center;min-width:2px}
+.tlb b{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tlb small{font-size:10.5px;color:var(--sub);white-space:nowrap;font-variant-numeric:tabular-nums}
+.tlb.dim{opacity:.45}
+.tlb.mine{background:color-mix(in srgb,var(--red) 16%,var(--card));border:1.5px dashed var(--red);border-left-width:3px;border-left-style:solid}
+.tlo{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--red) 38%,transparent) 0 4px,transparent 4px 8px);pointer-events:none;border-left:1.5px solid var(--red);border-right:1.5px solid var(--red)}
+.tlx{position:relative;height:18px;margin-left:68px}
+.tlx span{position:absolute;top:0;transform:translateX(-50%);font-size:10.5px;color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tlx span i{display:block;width:1px;height:4px;background:var(--sep);margin:0 auto 2px}
 /* ===== 컴퓨터 화면 (html.desk) ===== */
 html.desk body{padding-left:228px}
 html.desk .wrap{padding:22px 32px 48px}
@@ -1182,7 +1198,8 @@ function applyOverlays(blocks, D, wake, sleep, isSchool){
         for (const h of hard){ if (h.s > c) pcs.push([c, Math.min(h.s, O.e)]); c = Math.max(c, h.e); }
         if (c < O.e) pcs.push([c, O.e]);
         const best = pcs.filter(p => p[1] - p[0] >= 5).sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]))[0];
-        trims.push({ label:O.label, key:O.key, with:hard[0].label, from:[O.s, O.e], to:best || null });
+        trims.push({ label:O.label, key:O.key, kind:O.type, with:hard[0].label, from:[O.s, O.e], to:best || null,
+          hard:hard.map(h => ({ label:h.label, s:h.s, e:h.e, key:h.key, type:h.type, ev: h.ev ? (h.ev.extra ? 'x:' + h.ev.id : h.ev.id) : null })) });
         if (!best) continue;
         O = { ...O, s:best[0], e:best[1], trimmed:true };
       }
@@ -1263,7 +1280,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "4d747a19242f";
+const BUILD = "b836ad2f70dd";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1837,7 +1854,7 @@ function simplifyBlocks(blocks, opt){
     if (b0.type === 'rest' && !rests && d < 60 && !(b0.custom && !String(b0.key).startsWith('gap:'))) continue;
     if (b0.key === 'wash' && !rests) continue;
     if (b0.type === 'rest' && d < 5) continue;
-    if (b0.type === 'travel' && d < 20) continue;
+    if (b0.type === 'travel' && d < 20 && !(b0.custom && b0.cx)) continue;   /* 직접 넣은 이동은 짧아도 보인다 */
     if (b0.type === 'check' && d <= 10) continue;
     const b = { ...b0, members:[b0.s] };
     if (b.type === 'wake') b.label = '기상 · 준비';
@@ -2094,7 +2111,8 @@ function viewToday(){
   const unset = [...new Set((S.academies||[]).filter(a => a.day == null || !a.start).map(a => a.name))];
   if (unset.length) h += `<div class="banner info tap" data-act="openweekly">${IC.info}<div>${unset.map(esc).join(', ')} 시간이 비어 있습니다 <span style="color:var(--tint)">넣기 ›</span></div></div>`;
   for (const w of R.warnings) h += banner(esc(w));
-  for (const t of (R.trims || [])){ const w = /^이동|^귀가|^등교/.test(t.with) ? '이동 시간' : t.with; h += `<div class="banner">${IC.warn}<div>${t.to ? `<b>${esc(t.label)}</b>${josa(t.label, '이', '가')} ${esc(w)}${josa(w, '과', '와')} 겹쳐서 ${fmt(t.to[0])}–${fmt(t.to[1])}만 넣었습니다` : `<b>${esc(t.label)}</b>${josa(t.label, '이', '가')} ${esc(w)}${josa(w, '과', '와')} 완전히 겹칩니다`}<div class="mbtns" style="margin-top:8px"><button class="ci ci1" data-act="fixtrim" data-d="${cur}" data-k="${esc(t.key)}" data-v="${t.to ? t.to.join(',') : ''}">${t.to ? '이 시간으로 저장' : '지우기'}</button><button class="ci" data-act="openblk" data-k="${esc(t.key)}" data-d="${cur}">${t.to ? '직접 바꾸기' : '시간 바꾸기'}</button></div></div></div>`; }
+  (R.trims || []).forEach((t, i) => { const w = /^이동|^귀가|^등교/.test(t.with) ? '이동 시간' : t.with;
+    h += `<div class="banner tap" data-act="opentrim" data-d="${cur}" data-i="${i}">${IC.warn}<div><b>${esc(t.label)} ${fmt(t.from[0])}–${fmt(t.from[1])}</b>${josa(t.label, '이', '가')} ${esc(w)}${josa(w, '과', '와')} ${t.to ? '일부' : '완전히'} 겹칩니다 <span style="color:var(--tint);white-space:nowrap">자세히 보기 ›</span></div></div>`; });
   const rm = cur >= today() ? restMent(R, isToday) : '';
   h += rm;
   if (cur >= today()){ const I = fitInfo(cur);
@@ -2318,10 +2336,9 @@ function sheetSave(){
   }
   const fa = FORM_SAVE[st.type] || (st.type === 'acad' && st.isNew ? 'naadd' : null);
   if (fa){
-    const pb = document.querySelector(`#sbody [data-act="${fa}"]`);
+    if (st.type === 'flex' && !(st.form && st.form.to)){ toast('요일을 골라 주세요'); return; }
     const empty = st.type === 'hw' ? !(($('#hf-title') || {}).value || '').trim() : st.type === 'breaks' ? !(st.pick && st.pick.length) : false;
-    if (pb && !pb.disabled && !empty){ pb.click(); if (sheet === st) { sheet = st.prev || null; render(); } return; }
-    if (st.type === 'flex' && pb && pb.disabled){ toast('요일을 골라 주세요'); return; }
+    if (!empty){ fireAct(fa); return; }
   }
   sheet = st.prev || null; render();
 }
@@ -2362,6 +2379,7 @@ function renderSheet(){
   else if (sheet.type === 'myweek'){ title = sheet.mode === 'default' ? '내 공부 기본 목록' : '이번 주 내 공부'; body = myWeekSheetHTML(sheet); }
   else if (sheet.type === 'when'){ const r = whenSheetHTML(sheet); title = r.title; body = r.body; }
   else if (sheet.type === 'jikbo'){ title = '학원 직보'; body = jbSheetHTML(sheet); }
+  else if (sheet.type === 'trim'){ title = '겹치는 일정'; right = '닫기'; body = trimSheetHTML(sheet); }
   else if (sheet.type === 'add'){ title = shortDate(sheet.date) + ' 추가'; body = addSheetHTML(sheet); }
   else if (sheet.type === 'print'){ title = '인쇄'; body = printSheetHTML(); right = '닫기'; }
   else if (sheet.type === 'pdfready'){ title = 'PDF'; right = '닫기'; body = PDFREADY ? `<div class="sf" style="padding:0 16px 14px;font-size:15px">${esc(PDFREADY.name)}</div>` + grp('', `<button class="rw tap add" data-act="pdfsave"><div class="mid"><div class="tt">PDF 저장</div><div class="st">다운로드 폴더에 저장됩니다</div></div></button>`) : ''; }
@@ -2382,7 +2400,6 @@ function flexSheetHTML(){
   b += `<div class="sec"><div class="grp"><div class="rw" style="display:block"><div class="dps">${pills}</div></div>
     <div class="rw"><div class="mid" style="flex:none"><div class="tt">시간</div></div><span style="flex:1"></span><input type="time" id="fx-s" value="${st.start}"><span class="val">~</span><input type="time" id="fx-e" value="${st.end}"></div>
     <div class="rw"><div class="mid"><div class="tt">장소</div></div><select id="fx-p">${[['home','집'],['school','학교 앞'],['daechi','대치']].map(([k,l]) => `<option value="${k}" ${st.place===k?'selected':''}>${l}</option>`).join('')}</select></div></div></div>`;
-  b += `<button class="btn" data-act="fxsave" ${st.to ? '' : 'disabled style="opacity:.4"'}>${st.to ? shortDate(st.to) + '에 넣기' : '요일 선택'}</button>`;
   return b;
 }
 function printSheetHTML(){
@@ -2520,6 +2537,33 @@ function blkSheetHTML(st){
   if (nameRow){ const nb = body.replace(/(<div class="sf"[^>]*>[^<]*<\/div>)/, '$1' + nameRow); body = nb !== body ? nb : nameRow + body; }
   return { title, body };
 }
+/* 겹침 자세히: 무엇이 어디서 겹치는지 그림으로 보여 주고 고칠 방법을 고르게 한다 */
+function trimSheetHTML(st){
+  const R = buildDay(S, st.date, getDay(st.date)), t = (R.trims || [])[st.i];
+  if (!t) return `<div class="sf" style="padding:0 16px 14px;font-size:15px">이제 겹치는 일정이 없습니다.</div>`;
+  const [s0, e0] = t.from, H = t.hard, lo = Math.floor((Math.min(s0, ...H.map(h => h.s)) - 30) / 30) * 30, hi = Math.ceil((Math.max(e0, ...H.map(h => h.e)) + 30) / 30) * 30;
+  const X = m => ((m - lo) / (hi - lo) * 100).toFixed(2) + '%', W = (a, z) => ((z - a) / (hi - lo) * 100).toFixed(2) + '%';
+  const near = simplifyBlocks(R.blocks, { rests:true }).filter(b => b.e > lo && b.s < hi && b.key !== t.key && !H.some(h => h.key === b.key));
+  const mine = { travel:'이동', rest:'쉬기', meal:'식사', study:'공부' }[t.kind] || '일정';
+  let ticks = ''; for (let m = lo; m <= hi; m += 30) ticks += `<span style="left:${X(m)}"><i></i>${m % 60 === 0 ? fmt(m) : ''}</span>`;
+  const bar = (b, cls, lbl) => `<div class="tlb ${cls}" style="left:${X(Math.max(b.s, lo))};width:${W(Math.max(b.s, lo), Math.min(b.e, hi))};--c:${cls === 'mine' ? 'var(--red)' : colorOf(b)}"><b>${esc(lbl || b.label)}</b><small>${fmt(b.s)}–${fmt(b.e)}</small></div>`;
+  const ov = H.map(h => [Math.max(h.s, s0), Math.min(h.e, e0)]).filter(([a, z]) => z > a);
+  let g = `<div class="tlv"><div class="tlr"><span class="tll">시간표</span><div class="tlt">${near.map(b => bar(b, 'dim')).join('')}${H.map(h => bar(h, 'hard')).join('')}${ov.map(([a, z]) => `<div class="tlo" style="left:${X(a)};width:${W(a, z)}"></div>`).join('')}</div></div>`
+    + `<div class="tlr"><span class="tll">넣은 ${mine}</span><div class="tlt">${bar({ s:s0, e:e0 }, 'mine', t.label)}${ov.map(([a, z]) => `<div class="tlo" style="left:${X(a)};width:${W(a, z)}"></div>`).join('')}</div></div>`
+    + `<div class="tlx">${ticks}</div></div>`;
+  const hn = H.map(h => `${esc(h.label)}(${fmt(h.s)}–${fmt(h.e)})`).join(', ');
+  const why = t.to
+    ? `직접 넣은 <b>${esc(t.label)} ${fmt(s0)}–${fmt(e0)}</b> 중 <b>${ov.map(([a, z]) => fmt(a) + '–' + fmt(z)).join(', ')}</b>이 ${hn} 시간과 겹칩니다. 학원·학교·이동처럼 옮길 수 없는 일정이 먼저라서, 겹치지 않는 <b>${fmt(t.to[0])}–${fmt(t.to[1])}</b>만 시간표에 넣었습니다.`
+    : `직접 넣은 <b>${esc(t.label)} ${fmt(s0)}–${fmt(e0)}</b>이 ${hn} 안에 완전히 들어가 있습니다. 학원·학교·이동처럼 옮길 수 없는 일정이 먼저라서 시간표에 넣지 못했습니다.`;
+  let b = `<div class="trimwhy">${why}</div>` + g;
+  if (/^cx:/.test(t.key) && t.kind === 'travel' && H.some(h => h.type === 'acad')) b += `<div class="sf" style="padding:0 16px 12px">학원 시간을 바꾸기 전에 넣어 둔 이동이 남아 있는 것일 수 있습니다.</div>`;
+  let acts = '';
+  if (t.to) acts += `<button class="rw tap add" data-act="fixtrim" data-d="${st.date}" data-k="${esc(t.key)}" data-v="${t.to.join(',')}"><div class="mid"><div class="tt">${fmt(t.to[0])}–${fmt(t.to[1])}로 저장</div><div class="st">겹치는 부분을 빼고 저장합니다</div></div></button>`;
+  acts += `<button class="rw tap" data-act="openblk" data-k="${esc(t.key)}" data-d="${st.date}"><div class="mid"><div class="tt">${esc(t.label)} 시간 바꾸기</div></div>${IC.chv}</button>`;
+  for (const h of H) if (h.ev) acts += `<button class="rw tap" data-act="openacad" data-k="${esc(h.ev)}" data-d="${st.date}"><div class="mid"><div class="tt">${esc(h.label)} 시간 바꾸기</div></div>${IC.chv}</button>`;
+  acts += `<button class="rw tap danger" data-act="fixtrim" data-d="${st.date}" data-k="${esc(t.key)}" data-v=""><div class="mid"><div class="tt">${esc(t.label)} ${fmt(s0)}–${fmt(e0)} 지우기</div></div></button>`;
+  return b + grp('고치기', acts);
+}
 /* 시간 맞추기: 넘치는 날 밥·쉬는 시간 넣고, 할 일 시간 줄이거나 옮기기 */
 function fitInfo(date){
   const D = getDay(date), R = buildDay(S, date, D), B = simplifyBlocks(R.blocks, { rests:true }), P = planFor(date, B), F = dayFlow(date, B, P);
@@ -2609,7 +2653,6 @@ function breaksSheetHTML(st){
     <button class="rw tap add" data-act="brkone"><div class="mid"><div class="tt">이 시간에 넣기</div></div></button>`);
   const mine = (getDay(st.date).extra || []).filter(x => x.kind === 'rest');
   if (mine.length) b += grp('넣은 쉬는 시간', mine.map(x => `<div class="rw"><div class="mid"><div class="tt">☕ ${x.start} – ${x.end}</div></div><button class="xbtn" data-act="brkdel" data-id="${x.id}">✕</button></div>`).join(''));
-  b += `<button class="btn" data-act="brkadd" ${st.pick.length ? '' : 'disabled style="opacity:.4"'}>${st.pick.length ? st.pick.length + '개 넣기' : '시간을 골라 주세요'}</button>`;
   return b;
 }
 function taskAt(R, m){
@@ -2688,7 +2731,6 @@ function addSheetHTML(st){
     const rows = L.map(x => `<div class="rw msr"><button class="msr-a" data-act="addat" data-v="${x.s}"><span class="dot" style="background:${colorOf(x)}"></span><span class="msr-t">${fmt(x.s)}–${fmt(x.e)}</span><span class="msr-n">${esc(x.label)}</span>${sM === x.s ? IC.tick : ''}</button><button class="msr-b ${sM === x.e ? 'on' : ''}" data-act="addat" data-v="${x.e}">끝나고</button></div>`).join('');
     if (rows) b += grp(shortDate(st.date) + ' 일정', rows, '누르면 그 시간부터 넣습니다. 길이는 그대로입니다.');
   }
-  b += `<button class="btn" data-act="addsave">넣기</button>`;
   return b;
 }
 
@@ -2731,7 +2773,6 @@ function acadSheetHTML(st){
       ${once ? '' : `<div class="rw"><div class="mid"><div class="tt">요일</div></div><select id="na-day">${[1,2,3,4,5,6,0].map(i => `<option value="${i}" ${f.day===i?'selected':''}>${DAYS[i]}요일</option>`).join('')}</select></div>`}
       <div class="rw"><div class="mid" style="flex:none"><div class="tt">시간</div></div><span style="flex:1"></span><input type="time" id="na-s" value="${f.start}"><span class="val">~</span><input type="time" id="na-e" value="${f.end}"></div>
       <div class="rw"><div class="mid"><div class="tt">장소</div></div><select id="na-p">${[['home','집'],['school','학교 앞'],['daechi','대치']].map(([k,l]) => `<option value="${k}" ${f.place===k?'selected':''}>${l}</option>`).join('')}</select></div>`);
-    b += `<button class="btn" data-act="naadd">${once ? shortDate(st.date) + '에만 추가' : '매주 추가'}</button>`;
     return { title: once ? '이번만 일정' : '학원 · 과외 추가', body: b };
   }
   if (once){
@@ -2799,7 +2840,6 @@ function hwSheetHTML(){
     <div class="rw"><div class="mid"><div class="tt">나눌 횟수</div></div><div class="step"><button data-act="hfn" data-n="-1">−</button><span>${f.n}번</span><button data-act="hfn" data-n="1">+</button></div></div>`,
     dates.length ? '→ ' + dates.map(shortDate).join(', ') : '마감 날짜를 확인해 주세요');
   b += rangeEditor(f, 'hf');
-  b += `<button class="btn" data-act="hfadd">추가</button>`;
   return b;
 }
 
@@ -2873,6 +2913,7 @@ document.addEventListener('click', e => {
     case 'opentimes': openSheet({ type:'times' }); return;
     case 'sheetclose': sheet = null; render(); return;
     case 'sheetsave': sheetSave(); return;
+    case 'opentrim': openSheet({ type:'trim', date:d, i:+t.dataset.i }); return;
     case 'sheetcancel': sheetCancel(); return;
     case 'sheetback': if (sheet && sheet.prev){ sheet = sheet.prev; renderSheet.back = true; render(); } return;
     case 'undo': undoChange(d, t.dataset.k); toast('되돌렸습니다'); return;
@@ -2969,7 +3010,7 @@ document.addEventListener('click', e => {
     case 'dddel': { const id = t.dataset.id; if (delArm !== 'dd' + id){ delArm = 'dd' + id; render(); return; } delArm = null; S.ddays = (S.ddays || []).filter(x => x.id !== id); saveS(); return; }
     case 'fixtrim': { const id = t.dataset.k.slice(3), v2 = t.dataset.v;
       setDay(d, D => { if (!v2){ D.extra = (D.extra || []).filter(x => x.id !== id); return; } const [a, z] = v2.split(',').map(Number); const x = (D.extra || []).find(y => y.id === id); if (x){ x.start = fmt(a); x.end = fmt(z); } });
-      toast(v2 ? '겹치지 않게 저장했습니다' : '지웠습니다'); return; }
+      if (sheet && sheet.type === 'trim') { sheet = null; render(); } toast(v2 ? '겹치지 않게 저장했습니다' : '지웠습니다'); return; }
     case 'dskip': { const k = t.dataset.k, dd = d || cur, id = k.slice(2).split('#')[0], dx = (S.daily || []).find(y => y.id === id), n = Math.max(1, +(dx && dx.split) || 1);
       setDay(dd, D => { D.skipPart = D.skipPart || {}; D.skipPart[k] = true;
         const all = []; for (let i = 0; i < n; i++) all.push(i === 0 ? 'd:' + id : 'd:' + id + '#' + i);
@@ -3980,7 +4021,6 @@ function jbSheetHTML(st){
     <div class="rw"><div class="mid" style="flex:none"><div class="tt">시간</div></div><span style="flex:1"></span><input type="time" id="jb-s" value="${f.start}"><span class="val">~</span><input type="time" id="jb-e" value="${f.end}"></div>
     <div class="rw"><div class="mid"><div class="tt">장소</div></div><select id="jb-p">${[['home','집'],['school','학교 앞'],['daechi','대치']].map(([k,l]) => `<option value="${k}" ${f.place===k?'selected':''}>${l}</option>`).join('')}</select></div>`,
     '그날 시간표에 직보로 들어가고, 장소에 맞춰 이동 시간이 붙습니다.');
-  b += `<button class="btn" data-act="exjbsave">${shortDate(f.date)} 직보 넣기</button>`;
   return b;
 }
 function jbRead(){ const f = sheet && sheet.form; if (!f) return; const g = id => document.getElementById(id); if (g('jb-name')) f.acad = g('jb-name').value; if (g('jb-s')) f.start = g('jb-s').value; if (g('jb-e')) f.end = g('jb-e').value; if (g('jb-p')) f.place = g('jb-p').value; }
