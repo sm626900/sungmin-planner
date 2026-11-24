@@ -1323,7 +1323,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "a252b2ce904d";
+const BUILD = "6f11486d90b9";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -2610,7 +2610,7 @@ function blkSheetHTML(st){
       const dv = R.events.filter(e => !e.skip && e.place === 'daechi');
       body += grp('이 날 시간', timeRow('bblktime', fmt(b.s), fmt(b.e)) + ((D.blk || {})[st.key] ? `<button class="rw tap add" data-act="blkreset" ${dA}><div class="mid"><div class="tt">원래대로</div></div></button>` : ''), '이 날만 바뀝니다.');
       if (false){}
-      else if (b.tplace === 'daechi' || dv.length){
+      else if (b.tplace === 'daechi' || (ev && ev.place === 'daechi') || /대치/.test(b.label)){   /* 대치를 오가는 이동일 때만 */
         let big = false; for (let i = 1; i < dv.length; i++) if (toMin(dv[i].start) - toMin(dv[i-1].end) >= 120) big = true;
         body += grp('대치 이동', `<div class="rw"><div class="mid"><div class="tt">갈 때 택시 타기</div><div class="st">버스 ${S.busMin}분 · 택시 ${S.taxiMin}분</div></div>${sw(R.transport === 'taxi','trans',`data-d="${st.date}"`)}</div><div class="rw"><div class="mid"><div class="tt">올 때 택시 타기</div></div>${sw((D.transportBack || R.transport) === 'taxi','transb',`data-d="${st.date}"`)}</div>` + (big ? `<div class="rw"><div class="mid"><div class="tt">학원 사이에 집 들렀다 가기</div></div>${sw(R.gapMode === 'home','gap',`data-d="${st.date}"`)}</div>` : '')
           + `<button class="rw tap add" data-act="opentimes"><div class="mid"><div class="tt">버스 · 택시 시간 바꾸기</div><div class="st">매주 적용</div></div>${IC.chv}</button>`);
