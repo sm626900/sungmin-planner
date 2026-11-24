@@ -1355,7 +1355,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "e1e5f6e8247c";
+const BUILD = "a8f8d9cbb303";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1916,7 +1916,9 @@ function render(){
   document.documentElement.classList.toggle('desk', DESK);
   $('#wrap').classList.toggle('wide', tab === 'week');
   $('#wrap').classList.toggle('two', DESK && tab === 'today');
-  const v = $('#view'), html = tab === 'today' ? viewToday() : tab === 'week' ? viewWeek() : tab === 'close' || tab === 'timer' ? viewClose() : tab === 'exam' ? viewExam() : viewHW();
+  let html; const v = $('#view');
+  try { html = tab === 'today' ? viewToday() : tab === 'week' ? viewWeek() : tab === 'close' || tab === 'timer' ? viewClose() : tab === 'exam' ? viewExam() : viewHW(); }
+  catch(e){ console.error(e); clearOut(); toast('화면을 그리다 오류가 났습니다 (' + (e && e.message || '') + ')'); return; }
   if (lastTab !== tab){ v.innerHTML = html; v.classList.remove('fade'); void v.offsetWidth; v.classList.add('fade'); clearTimeout(render.ft); render.ft = setTimeout(() => v.classList.remove('fade'), 450); lastTab = tab; }
   else morph(v, html);
   renderSheet();
@@ -4008,9 +4010,13 @@ function ddaySheetHTML(){
 /* 하루씩·주씩 옮기기 (버튼, 옆으로 쓸기 공용) */
 function goDay(n){ const nws = weekStartOf(addDays(cur, n)), wkChg = nws !== weekStart; swapWeek(n, wkChg, () => { cur = addDays(cur, n); weekStart = weekStartOf(cur); ensureDays(); render(); }); }
 /* 주가 바뀌면: 지금 내용을 먼저 살짝 내보내고(0.14초) 새 주를 들여온다. 같은 주면 바로 들여온다 */
+const clearOut = () => document.querySelectorAll('#view .slOutL, #view .slOutR').forEach(e => e.classList.remove('slOutL', 'slOutR'));
 function swapWeek(n, wkChg, apply){
   if (swapWeek.t){ clearTimeout(swapWeek.t); swapWeek.t = 0; swapWeek.fn && swapWeek.fn(); }
-  const run = () => { swapWeek.t = 0; swapWeek.fn = null; render.hold = 0; apply(); slideIn(n, wkChg); };
+  /* 그리는 중에 무슨 일이 생겨도 사라지는 효과(slOut)가 남아 화면이 비지 않게 */
+  const run = () => { swapWeek.t = 0; swapWeek.fn = null; render.hold = 0;
+    try { apply(); } catch(e){ console.error(e); }
+    finally { try { slideIn(n, wkChg); } catch(e){} setTimeout(clearOut, 450); } };
   if (!wkChg || matchMedia('(prefers-reduced-motion: reduce)').matches){ run(); return; }
   const els = slideTargets(true); if (!els.length){ run(); return; }
   const c = n > 0 ? 'slOutL' : 'slOutR';
