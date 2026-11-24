@@ -1147,7 +1147,7 @@ function buildDay(S, date, D){
       } else if (gap > 0 && gap <= 15){
         push({ s:t, e:A.s, label:'이동', type:'travel' });
       } else if (gap > 0){
-        fillFree(ctx, 'away', t, A.s, { beforeAnchor:true, place:placeLabel(loc, locEv), next:A.place });
+        fillFree(ctx, 'away', t, A.s, { beforeAnchor:true, place:placeLabel(loc, locEv), next:A.place, nextEv:A.ev });
       }
     } else if (A.place === 'home' && (leaveOf(locEv) != null || (locEv && locEv.travelBack != null))){
       const trB = backTr(locEv, tr), L = leaveOf(locEv) != null ? Math.max(t, leaveOf(locEv)) : A.s - trB;
@@ -1281,7 +1281,8 @@ function fillFree(ctx, where, s, e, opts){
   if (e - s <= 0) return;
   const S = ctx.S, fixed = [];
   /* 학교 앞에서는 자습하지 않는다: 비는 시간은 '빈 시간'으로 두고, 집에 갔다 오기를 고르면 귀가 · 집 공부 · 다시 이동으로 채운다 */
-  if (where === 'away' && opts.place === PLACES.school){
+  /* 시험 사이(다음이 시험)는 학교에서 자습, 그 밖에 학교·학교 앞에서 비는 시간은 자습하지 않는다 */
+  if (where === 'away' && (opts.place === PLACES.school || (opts.place === '학교' && opts.next)) && !(opts.nextEv && /^시험/.test(opts.nextEv.name || ''))){
     const D = ctx.D || {}, nx = opts.next || null;
     if (nx && (D.gohome || {})[s]){
       const back = +S.homeMin || 20;   /* 다시 나가는 이동은 뒤에서 이미 넣는다 */
@@ -1352,7 +1353,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "42ea0c2c9352";
+const BUILD = "7612390f53a3";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1667,7 +1668,7 @@ async function init(){
   let got = null;
   try { if (window.claude && window.claude.use) got = await window.claude.use('db'); } catch(e){}
   try { if (window.claude && window.claude.use) dl = await window.claude.use('downloads'); } catch(e){}
-  if (!got) got = await cloudDb();
+  if (!got && !/[?&]local\b/.test(location.search)) got = await cloudDb();   /* ?local: 시험용, 계정에 쓰지 않는다 */
   if (got){ db = got; mode = 'db'; setSync('연결됨'); } else { mode = 'local'; setSync('이 기기에만 저장'); }
   const timer = setTimeout(() => { if (!settingsLoaded) setSync('아직 못 불러옴'); }, 10000);
   sub('planner/settings', data => {
@@ -2665,7 +2666,7 @@ function blkSheetHTML(st){
   } else if (b.type === 'free' && !b.cx){
     title = '빈 시간';
     const A = b.away || { s:b.s, e:b.e, next:null };
-    body = head(fmt(b.s) + '–' + fmt(b.e)) + `<div class="sf" style="padding:0 16px 14px">학교 앞에서 비는 시간입니다.</div>`;
+    body = head(fmt(b.s) + '–' + fmt(b.e)) + `<div class="sf" style="padding:0 16px 14px">학교 근처에서 비는 시간입니다.</div>`;
     if (A.next) body += grp('', `<button class="rw tap add" data-act="gohome" data-d="${st.date}" data-s="${A.s}"><div class="mid"><div class="tt">집에 갔다 오기</div><div class="st">귀가 · 집 공부 · ${A.next === 'home' ? '' : '다시 이동'}</div></div></button>`);
     body += grp('이 시간에 넣기', [['study','공부'],['rest','쉬는 시간'],['meal','식사'],['travel','이동']].map(([k, l]) => `<button class="rw tap" data-act="freefill" data-v="${k}" data-d="${st.date}" data-s="${b.s}" data-e="${b.e}"><div class="mid"><div class="tt">${l}</div></div></button>`).join('')
       + `<button class="rw tap add" data-act="openadd" data-d="${st.date}" data-s="${b.s}" data-e="${b.e}" data-kind="event"><div class="mid"><div class="tt">일정 · 학원</div></div>${IC.chv}</button>`);
