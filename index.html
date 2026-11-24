@@ -838,6 +838,39 @@ body{-webkit-font-smoothing:antialiased;letter-spacing:-.01em}
   .dev .bchk{width:20px;height:20px}
   .dev .bchk svg{width:11px;height:11px}
 }
+.dcal .dev.past{opacity:.42;filter:saturate(.35)}
+.dcal .dev.past:hover{opacity:.7}
+.dcal .tk.slot.past{opacity:.45}
+.dcal .tk.slot.past.on{opacity:.6}
+/* ===== 컴퓨터 화면 (html.desk) ===== */
+html.desk body{padding-left:228px}
+html.desk .wrap{padding:22px 32px 48px}
+html.desk .wrap.two{max-width:1280px}
+html.desk .wrap.wide{max-width:1320px}
+@media (min-width:1900px){html.desk .wrap.two{max-width:1500px}html.desk .wrap.wide{max-width:1680px}html.desk .dcols{grid-template-columns:minmax(0,1.4fr) minmax(420px,1fr);gap:36px}}
+html.desk .tabbar{left:0;top:0;right:auto;bottom:0;width:228px;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:2px;padding:22px 12px 16px;border-top:0;border-right:.5px solid var(--sep);background:color-mix(in srgb,var(--card) 70%,var(--bg))}
+html.desk .tabbar>button,html.desk .dk-x button{flex:none;max-width:none;flex-direction:row;justify-content:flex-start;gap:10px;padding:7px 10px;border-radius:8px;font-size:14px;font-weight:500;color:var(--text);letter-spacing:-.1px;border:0;background:none;display:flex;align-items:center;width:100%;text-align:left}
+html.desk .tabbar>button svg{width:19px;height:19px;color:var(--tint)}
+html.desk .tabbar>button:hover,html.desk .dk-x button:hover{background:var(--fill)}
+html.desk .tabbar>button.on{background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint);font-weight:600}
+html.desk .tabbar>button.rec::after{position:static;margin:0 0 0 -4px}
+html.desk .tabbar kbd,html.desk .dk-x kbd{margin-left:auto;font:500 11px/1 -apple-system,BlinkMacSystemFont,sans-serif;color:var(--sub);border:.5px solid var(--sep);border-radius:5px;padding:3px 5px;background:var(--card)}
+.dk-brand{font-size:13px;font-weight:600;color:var(--sub);padding:0 10px 12px;letter-spacing:.02em}
+.dk-sp{flex:1}
+.dk-x{display:flex;flex-direction:column;gap:2px;border-top:.5px solid var(--sep);padding-top:10px}
+.dk-x .dk-i{width:19px;display:grid;place-items:center;color:var(--sub);font-size:16px}
+.dk-x .dk-i svg{width:17px;height:17px}
+.dk-sync{padding:10px 10px 0;font-size:11.5px}
+html.desk .foot,html.desk .nav .navl,html.desk .nav .ibtn2{display:none}
+html.desk .nav{min-height:0}
+html.desk .dcols{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(340px,1fr);gap:28px;align-items:start}
+html.desk .dc-b{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain;padding:0 4px 24px;margin:0 -4px;scrollbar-width:thin}
+html.desk .dc-b>.sec:first-child,html.desk .dc-a>.sec:first-child{margin-top:0}
+html.desk .rw.tap:hover,html.desk .ti.tap:hover,html.desk .banner.tap:hover{background:color-mix(in srgb,var(--fill) 60%,var(--card))}
+html.desk .dev:hover,html.desk .wg .bk:hover,html.desk .wg .wtk:hover{filter:brightness(.96)}
+html.desk .sheet{max-width:560px}
+html.desk ::-webkit-scrollbar{width:10px;height:10px}
+html.desk ::-webkit-scrollbar-thumb{background:var(--fill2);border-radius:10px;border:3px solid transparent;background-clip:content-box}
 </style>
 </head>
 <body>
@@ -1202,7 +1235,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "5cfde5663bf4";
+const BUILD = "5bf51cad484e";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1299,10 +1332,27 @@ async function cloudDb(){
 }
 
 /* ===== 파일 받기 ===== */
+const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+/* Mac Safari에서 'Dock에 추가'한 웹 앱: 파일 다운로드가 막혀 있어 인쇄 창(PDF로 저장)을 쓴다 */
+const macWebApp = () => !isIOS() && /Mac/.test(navigator.platform) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent)
+  && ((window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true);
+function printImages(urls, size, orient){
+  return new Promise(res => {
+    const box = document.createElement('div'); box.id = 'printimgs';
+    const pg = (size === 'A5' ? 'A5' : 'A4') + ' ' + (orient === 'landscape' ? 'landscape' : 'portrait');
+    box.innerHTML = `<style>#printimgs{display:none}@page{size:${pg};margin:0}@media print{html,body{background:#fff!important;padding:0!important;margin:0!important}body>*:not(#printimgs){display:none!important}#printimgs{display:block!important}#printimgs img{display:block;width:100%;height:100vh;object-fit:contain;break-after:page;page-break-after:always}#printimgs img:last-child{break-after:auto;page-break-after:auto}}</style>` + urls.map(u => `<img src="${u}">`).join('');
+    document.body.appendChild(box);
+    const done = () => { window.removeEventListener('afterprint', done); setTimeout(() => box.remove(), 300); res(); };
+    Promise.all([...box.querySelectorAll('img')].map(i => i.decode ? i.decode().catch(() => {}) : null)).then(() => {
+      window.addEventListener('afterprint', done);
+      setTimeout(() => { window.print(); if (!('onafterprint' in window)) done(); }, 50);
+    });
+  });
+}
 async function saveFile(filename, blob){
   if (dl) return dl.save({ filename, data:blob });
-  const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  if (iOS && navigator.canShare){
+  const iOS = isIOS();
+  if ((iOS || macWebApp()) && navigator.canShare){
     const file = new File([blob], filename, { type:blob.type });
     if (navigator.canShare({ files:[file] })){
       try { await navigator.share({ files:[file] }); return; }
@@ -1335,7 +1385,8 @@ async function checkUpdate(){
 setTimeout(checkUpdate, 4000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
 /* ===== 상태 ===== */
-const today = () => ymd(new Date());
+/* 하루는 새벽 6시에 바뀐다 (nowMin과 같은 기준). 밤 12시가 넘어도 06시 전까지는 어제 시간표의 맨 아래(00시~)로 본다. */
+const today = () => ymd(new Date(Date.now() - 6 * 3600 * 1000));
 let S = defaultSettings();
 let HW = { items: [] };
 const DAYDOC = {};
@@ -1474,7 +1525,7 @@ function setDay(date, fn){ const d = clone(getDay(date)); delete d.fromTpl; fn(d
 function ensureDays(){
   const want = new Set();
   for (let i = -7; i < 14; i++) want.add(addDays(weekStart, i));   /* 앞뒤 주도 미리 받아 두면 주를 넘길 때 덜컥거리지 않는다 */
-  for (let i = -1; i <= 1; i++){ want.add(addDays(cur, i)); want.add(addDays(selDate, i)); want.add(addDays(ymd(new Date(Date.now() - 5*3600*1000)), i)); }
+  for (let i = -1; i <= 1; i++){ want.add(addDays(cur, i)); want.add(addDays(selDate, i)); want.add(addDays(today(), i)); }
   const ws2 = weekStartOf(selDate); for (let i = 0; i < 7; i++) want.add(addDays(ws2, i));
   for (const d of want){
     const p = 'days/' + d;
@@ -1689,6 +1740,10 @@ function undoChange(date, k){
   }
 }
 
+/* 컴퓨터(마우스·트랙패드 + 넓은 화면)에서는 왼쪽 메뉴 + 두 단 화면 */
+const DESK_Q = matchMedia('(min-width:1024px) and (hover:hover) and (pointer:fine)');
+let DESK = DESK_Q.matches;
+DESK_Q.addEventListener && DESK_Q.addEventListener('change', q => { DESK = q.matches; lastTab = null; render(); });
 /* ===== 부드러운 화면 갱신: 바뀐 부분만 고치기 ===== */
 const ANIM_CLS = new Set(['slL', 'slR', 'slOutL', 'slOutR', 'tfL', 'tfR', 'fade']);
 function morph(el, html){
@@ -1730,8 +1785,11 @@ function render(){
   const ae = document.activeElement;
   if (ae && ae.dataset && ae.dataset.keep && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) return;
   if (tab === 'set') tab = 'today';
-  morph($('#tabbar'), [['today','오늘'],['week','주간'],['exam','시험'],['hw','숙제'],['close','마감']].map(([k,l]) => `<button class="${tab===k?'on':''}" data-tab="${k}">${IC[k]}<span>${l}</span></button>`).join(''));
+  morph($('#tabbar'), (DESK ? `<div class="dk-brand">공부 플래너</div>` : '') + [['today','오늘','T'],['week','주간','W'],['exam','시험',''],['hw','숙제',''],['close','마감','']].map(([k,l,kb]) => `<button class="${tab===k?'on':''}" data-tab="${k}">${IC[k]}<span>${l}</span>${DESK && kb ? `<kbd>${kb}</kbd>` : ''}</button>`).join('')
+    + (DESK ? `<div class="dk-sp"></div><div class="dk-x"><button data-act="openadd" data-d="${cur}"><span class="dk-i">＋</span><span>추가</span><kbd>N</kbd></button><button data-act="openmemo" data-ws="${tab === 'week' ? weekStart : weekStartOf(cur)}"><span class="dk-i">✎</span><span>이번 주 메모</span></button><button data-act="printsheet"><span class="dk-i">⎙</span><span>인쇄 · PDF</span><kbd>P</kbd></button><button data-act="openweekly"><span class="dk-i">${GEAR}</span><span>설정</span></button></div><div class="dk-sync"><span class="sync ${/동기화됨|연결됨|저장 중|불러오는/.test(syncTxt) ? '' : 'warn'}">${esc(syncTxt)}</span></div>` : ''));
+  document.documentElement.classList.toggle('desk', DESK);
   $('#wrap').classList.toggle('wide', tab === 'week');
+  $('#wrap').classList.toggle('two', DESK && tab === 'today');
   const v = $('#view'), html = tab === 'today' ? viewToday() : tab === 'week' ? viewWeek() : tab === 'close' || tab === 'timer' ? viewClose() : tab === 'exam' ? viewExam() : viewHW();
   if (lastTab !== tab){ v.innerHTML = html; v.classList.remove('fade'); void v.offsetWidth; v.classList.add('fade'); clearTimeout(render.ft); render.ft = setTimeout(() => v.classList.remove('fade'), 450); lastTab = tab; }
   else morph(v, html);
@@ -1771,11 +1829,40 @@ function blkKeysOf(date, key){
   const pre = key.replace(/:\d+\+?$/, ':'), ks = R.blocks.filter(x => x.key && x.key.startsWith(pre) && b.members.includes(x.s)).map(x => x.key);
   return ks.length ? ks : [key];
 }
+/* 이어 붙은 공부 칸들 (학교·야자 칸은 빼고) */
+const mergeable = b => b && STUDYT.includes(b.type) && !/^seg:/.test(b.key || '');
+function studyRun(date, key, D){
+  const L = simplifyBlocks(buildDay(S, date, D || getDay(date)).blocks, { rests:true });
+  const i = L.findIndex(x => x.key === key); if (i < 0 || !mergeable(L[i])) return [];
+  let a = i, z = i;
+  while (a > 0 && mergeable(L[a-1]) && L[a-1].e === L[a].s) a--;
+  while (z < L.length - 1 && mergeable(L[z+1]) && L[z+1].s === L[z].e) z++;
+  return L.slice(a, z + 1);
+}
+/* 여러 공부 칸을 한 칸으로: 원래 칸은 이 날만 숨기고, 같은 시간에 공부 칸 하나를 넣은 뒤 할 일을 그 칸으로 옮긴다 */
+function mergeRun(date, D, run){
+  if (run.length < 2) return null;
+  const first = run.find(b => /^g:/.test(b.key || '')) || run[0];
+  const id = uid(), nk = 'cx:' + id, old = new Set();
+  D.extra = D.extra || []; D.blk = D.blk || {};
+  for (const b of run){
+    if (/^cx:/.test(b.key)){ old.add(b.key); D.extra = D.extra.filter(x => 'cx:' + x.id !== b.key); continue; }
+    const pre = b.key.replace(/:\d+\+?$/, ':');
+    const ks = /:\d+\+?$/.test(b.key) && b.members ? buildDay(S, date, D).blocks.filter(x => x.key && x.key.startsWith(pre) && b.members.includes(x.s)).map(x => x.key) : [];
+    for (const k of new Set([b.key, ...ks])){ old.add(k); D.blk[k] = { hide:true }; }
+  }
+  const tag = first.fixedTag || (first.tag === 'my' ? 'my' : 'hw');
+  D.extra.push({ id, name:first.label, start:fmt(run[0].s), end:fmt(run[run.length - 1].e), kind:'study', tag, place:'here' });
+  for (const m of ['plan']) for (const t in (D[m] || {})) if (old.has(D[m][t])) D[m][t] = nk;
+  if (D.done) for (const k of old) delete D.done[k];
+  return nk;
+}
 /* 지운 칸 자리에 남는 '쉬는 시간'은 공부 시간으로 바꾼다(지웠는데 쉬는 시간이 그대로 보이지 않게) */
 function gapToStudy(date, D, s, e){
   if (s == null || e == null) return;
   for (const g of buildDay(S, date, D).blocks.filter(b => b.type === 'rest' && /^gap:/.test(b.key || '') && b.s < e && b.e > s)){
-    D.extra = D.extra || []; D.extra.push({ id:uid(), name:'공부', start:fmt(g.s), end:fmt(g.e), kind:'study', tag:'hw', place:'here' });
+    const id = uid(); D.extra = D.extra || []; D.extra.push({ id, name:'공부', start:fmt(g.s), end:fmt(g.e), kind:'study', tag:'hw', place:'here' });
+    const run = studyRun(date, 'cx:' + id, D); if (run.length > 1) mergeRun(date, D, run);
   }
 }
 function findBlock(date, key){
@@ -1987,11 +2074,12 @@ function viewToday(){
   if (cur >= today()){ const I = fitInfo(cur);
     if (I.ov) h += `<div class="banner tap" data-act="openfit" data-d="${cur}">${IC.warn}<div>할 일이 공부 칸보다 <b>${durShort(I.ov)}</b> 넘칩니다 <span style="color:var(--tint)">시간 맞추기 ›</span></div></div>`;
     else if (I.longest >= 300 && !I.meals.length && I.left.length) h += `<div class="banner info tap" data-act="openfit" data-d="${cur}">${IC.info}<div>집에서 오래 공부하는데 밥 시간이 없습니다 <span style="color:var(--tint)">넣기 ›</span></div></div>`; }
-  h += `<div class="sec"><div class="sh"><span>시간표</span><span class="tot">공부 칸 <b>${durTxt(R.studyMin)}</b></span></div>${dayCalHTML(R, cur, isToday)}<div class="sf">칸을 누르면 이 날만 바꿀 수 있습니다. 할 일은 꾹 눌러서 다른 칸으로 옮길 수 있고, 오른쪽 위 동그라미는 그 계획을 했는지 체크하는 곳입니다.</div></div>`;
+  h += `<div class="dcols"><div class="dc-a"><div class="sec"><div class="sh"><span>시간표</span><span class="tot">공부 칸 <b>${durTxt(R.studyMin)}</b></span></div>${dayCalHTML(R, cur, isToday)}<div class="sf">${DESK ? '칸을 누르면 이 날만 바꿀 수 있습니다. 할 일은 꾹 눌러서 다른 칸으로 옮깁니다. ← → 키로 날짜를 넘깁니다.' : '칸을 누르면 이 날만 바꿀 수 있습니다. 할 일은 꾹 눌러서 다른 칸으로 옮길 수 있고, 오른쪽 위 동그라미는 그 계획을 했는지 체크하는 곳입니다.'}</div></div></div><div class="dc-b">`;
   { const ws = weekStartOf(cur), W = WEEKDOC[ws] || {}, rest = (W.tasks || []);
     if (rest.length) h += grp('이번 주에 아직 안 넣은 할 일', rest.map(x => `<div class="rw"><div class="mid"><div class="tt">${esc(x.text)} <span class="tmin">${durShort(x.min)}</span></div><div class="st">${shortDate(x.due)}까지</div></div><button class="tmb" data-act="wkToDay" data-id="${x.id}" data-ws="${ws}">오늘 하기</button></div>`).join('')); }
   h += taskRows(cur, list, od);
   if (cur >= today() && breakStretches(R).length) h += `<button class="brklink" data-act="openbreaks" data-d="${cur}">☕ 쉬는 시간 추천 받기 <span>쉬지 않고 이어지는 공부 ${breakStretches(R).length}구간</span></button>`;
+  h += `</div></div>`;
   h += footer();
   return h;
 }
@@ -2275,6 +2363,8 @@ function blkSheetHTML(st){
   if (!b) return { title:'일정', body:'<div class="sf" style="padding:0 16px">일정이 바뀌었습니다. 시간표에서 다시 눌러 주세요.</div>' };
   const D = getDay(st.date), dA = `data-d="${st.date}" data-k="${esc(st.key)}"`;
   const head = (t) => `<div class="sf" style="padding:0 16px 14px;font-size:15px">${shortDate(st.date)} ${t} · 이 날만 적용</div>`;
+  const runM = mergeable(b) ? studyRun(st.date, st.key) : [];
+  const mergeRow = runM.length > 1 ? grp('', `<button class="rw tap add" data-act="blkmerge" ${dA}><div class="mid"><div class="tt">이어진 공부 칸 합치기</div><div class="st">${runM.length}칸 → ${fmt(runM[0].s)}–${fmt(runM[runM.length - 1].e)} 한 칸으로</div></div></button>`) : '';
   const putOther = `<button class="rw tap add" data-act="openadd" data-d="${st.date}" data-s="${b.s}" data-e="${b.e}"><div class="mid"><div class="tt">이 시간에 다른 거 넣기</div><div class="st">저녁·쉬기·약속을 넣으면 이 칸이 그만큼 줄어듭니다</div></div>${IC.chv}</button>`;
   const timeRow = (act, s, e) => `<div class="rw"><div class="mid" style="flex:none"><div class="tt">시간</div></div><span style="flex:1"></span><input type="time" data-act="${act}" data-w="s" ${dA} value="${s}"><span class="val">~</span><input type="time" data-act="${act}" data-w="e" ${dA} value="${e}"></div>`;
   let body = '', title = b.label;
@@ -2320,7 +2410,7 @@ function blkSheetHTML(st){
     body = head(fmt(b.s) + '–' + fmt(b.e));
     body += grp('', `<div class="rw"><div class="mid"><div class="tt">이름</div></div><input type="text" data-keep="1" data-act="bcxname" ${dA} value="${esc(x.name)}"></div>` + timeRow('bcxtime', x.start, x.end)
       + `<div class="rw"><div class="mid">${seg([['meal','식사'],['rest','쉬기'],['study','공부'],['travel','이동']], x.kind, 'bcxkind', dA)}</div></div>` + (x.kind === 'study' ? `<div class="rw"><div class="mid">${TAGSEG(x.tag, dA)}</div></div>` : ''));
-    body += taskSec;
+    body += taskSec + mergeRow;
     body += grp('', `<button class="rw tap danger" data-act="bcxdel" ${dA}><div class="mid"><div class="tt">지우기</div></div></button>`);
   } else if (b.type === 'travel'){
     body = head(fmt(b.s) + '–' + fmt(b.e));
@@ -2351,7 +2441,7 @@ function blkSheetHTML(st){
   } else {
     body = head(fmt(b.s) + '–' + fmt(b.e));
     body += grp('시간', timeRow('bblktime', fmt(b.s), fmt(b.e)) + ((D.blk || {})[st.key] || Object.keys(D.blk || {}).some(k => (b.members || [b.s]).some(m => k === st.key.replace(/:\d+\+?$/, ':') + m)) ? `<button class="rw tap add" data-act="blkreset" ${dA}><div class="mid"><div class="tt">원래대로</div></div></button>` : ''), '줄이거나 옮기면 비는 시간은 쉬는 시간이 됩니다.');
-    body += taskSec;
+    body += taskSec + mergeRow;
     if (STUDYT.includes(b.type)) body += grp('중간에 넣기', `<button class="rw tap add" data-act="openadd" data-kind="rest" data-d="${st.date}" data-s="${b.s + 50}" data-e="${b.s + 60}"><div class="mid"><div class="tt">+ 쉬는 시간</div></div></button><button class="rw tap add" data-act="openadd" data-kind="travel" data-d="${st.date}" data-s="${b.s + 60}" data-e="${b.s + 90}"><div class="mid"><div class="tt">+ 이동</div></div></button><button class="rw tap add" data-act="openbreaks" data-d="${st.date}"><div class="mid"><div class="tt">쉬는 시간 추천 받기</div></div></button>`, '넣으면 뒤에 있는 할 일이 그만큼 뒤로 밀립니다.');
     body += grp('', putOther + (['rest','meal'].includes(b.type) ? `<button class="rw tap danger" data-act="blkstudy" ${dA}><div class="mid"><div class="tt">지우기</div><div class="st">이 시간은 공부 시간이 됩니다</div></div></button>` : STUDYT.includes(b.type) && !b.key.startsWith('seg:') ? `<button class="rw tap danger" data-act="blkhide" ${dA}><div class="mid"><div class="tt">이 칸 비우기</div><div class="st">쉬는 시간이 됩니다</div></div></button>` : ''));
   }
@@ -2666,7 +2756,7 @@ function addDaily(v){ S.daily.push({ id:uid(), text:v, days:[0,1,2,3,4,5,6] }); 
 document.addEventListener('click', e => {
   render.hold = 0;   /* 사용자가 누른 건 바로 그린다 */
   if (e.target === $('#scrim')){ sheet = null; delArm = null; render(); return; }
-  const tb = e.target.closest('#tabbar button');
+  const tb = e.target.closest('#tabbar button[data-tab]');
   if (tb){ tab = tb.dataset.tab; delArm = null; sheet = null; render(); window.scrollTo({ top:0, behavior:'smooth' }); return; }
   const t = e.target.closest('[data-act]'); if (!t || t.disabled) return;
   if (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA') return;
@@ -2803,6 +2893,7 @@ document.addEventListener('click', e => {
     case 'gapstudy': { const a = +t.dataset.s, z = +t.dataset.e; setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:'공부', start:fmt(a), end:fmt(z), kind:'study', tag:'hw', place:'here' }); }); sheet = null; render(); toast('공부 시간으로 바꿨습니다'); return; }
     case 'blkstudy': { const k = t.dataset.k, { b } = findBlock(d, k); if (!b) return; const keys = blkKeysOf(d, k); setDay(d, D => { D.blk = D.blk || {}; for (const kk of keys) D.blk[kk] = { toStudy:true }; }); sheet = null; render(); toast(b.label + ' 지웠습니다'); return; }
     case 'blkhide': { const k = t.dataset.k, keys = blkKeysOf(d, k), { b } = findBlock(d, k); setDay(d, D => { D.blk = D.blk || {}; for (const kk of keys) D.blk[kk] = { hide:true }; if (b && b.type === 'travel') gapToStudy(d, D, b.s, b.e); }); sheet = null; render(); toast(t.dataset.msg || '칸을 비웠습니다'); return; }
+    case 'blkmerge': { const k = t.dataset.k; let n = 0; setDay(d, D => { const run = studyRun(d, k, D); n = run.length; mergeRun(d, D, run); }); sheet = null; render(); toast('한 칸으로 합쳤습니다'); return; }
     case 'bsegdel': { const lb = segLabel(t.dataset.k); setDay(d, D => { D.seg = D.seg || {}; D.seg[lb] = { ...(D.seg[lb] || {}), study:true }; }); sheet = null; render(); toast(lb + ' 지웠습니다'); return; }
     case 'tdel': { const tk = t.dataset.tk, dd = d;
       if (tk.startsWith('t:')){ const id = tk.slice(2); setDay(dd, D => { D.todos = (D.todos || []).filter(x => x.id !== id); }); }
@@ -3013,6 +3104,22 @@ document.addEventListener('change', e => {
 let imeEnter = null, imeOn = false;
 document.addEventListener('compositionstart', () => { imeOn = true; });
 document.addEventListener('compositionend', e => { imeOn = false; if (imeEnter && imeEnter === e.target){ const t = imeEnter; imeEnter = null; setTimeout(() => t.blur(), 0); } });
+/* 컴퓨터: 단축키 */
+document.addEventListener('keydown', e => {
+  const tg = e.target, typing = tg && (/INPUT|TEXTAREA|SELECT/.test(tg.tagName) || tg.isContentEditable);
+  if (e.key === 'Escape' && sheet){ e.preventDefault(); if (typing) tg.blur(); sheet = null; delArm = null; render(); return; }
+  if (typing || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const go = f => { e.preventDefault(); f(); };
+  if (sheet) return;
+  if (k === 'ArrowLeft' || k === 'ArrowRight'){ const n = k === 'ArrowLeft' ? -1 : 1;
+    if (tab === 'today') return go(() => goDay(n));
+    if (tab === 'week' && !wkPlan) return go(() => swapWeek(n * 7, true, () => { weekStart = addDays(weekStart, n * 7); ensureDays(); render(); })); return; }
+  const tabs = { t:'today', w:'week', 'ㅅ':'today', 'ㅈ':'week' };
+  if (tabs[k]) return go(() => { if (tabs[k] === 'today' && cur !== today()){ if (tab !== 'today'){ cur = today(); weekStart = weekStartOf(cur); ensureDays(); } tab = 'today'; render(); const g = $('[data-act="gotoday"]'); if (g) g.click(); } else { tab = tabs[k]; render(); } });
+  if (k === 'n' || k === 'ㅜ') return go(() => openSheet({ type:'add', date:cur }));
+  if (k === 'p' || k === 'ㅔ') return go(() => { const b = document.createElement('button'); b.dataset.act = 'printsheet'; b.hidden = true; document.body.appendChild(b); b.click(); b.remove(); });
+});
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || e.target.type !== 'text') return;
   e.preventDefault();
@@ -3117,7 +3224,7 @@ document.addEventListener('focusout', e => {
 /* ===== 타이머: 계획한 칸을 시작하고 실제로 한 시간 재기 ===== */
 const hms = sec => { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0'); };
 const hmShort = sec => { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m/60) + '시간' + (m % 60 ? ' ' + (m % 60) + '분' : '') : m + '분'; };
-const studyDay = (t = Date.now()) => ymd(new Date(t - 5 * 3600 * 1000));
+const studyDay = (t = Date.now()) => ymd(new Date(t - 6 * 3600 * 1000));
 const curSec = () => TIMER && TIMER.running ? (Date.now() - Date.parse(TIMER.running.at)) / 1000 : 0;
 function actualSec(date, key){
   let s = 0; for (const x of (getDay(date).sessions || [])) if (x.key === key) s += +x.sec || 0;
@@ -3550,7 +3657,8 @@ function dayCalHTML(R, date, isToday){
     h += `<div class="dhr" style="top:${yy}px"><span>${(Math.floor(H / 60) % 24)}시</span></div>`;
   }
   for (const s of segs){ if (!s.b) continue; const b = s.b, c = colorOf(b), now = isToday && nm >= b.s && nm < b.e, k = esc(b.key || '');
-    if (b.type === 'rest'){ h += `<div class="dev rest ${now ? 'on' : ''}" data-act="openblk" data-k="${k}" data-d="${date}" style="top:${s.y + 1}px;height:${s.h - 2}px"><span>${b.key === 'wash' ? '🛁' : '☕'} ${esc(b.label)} · ${durShort(b.e - b.s)}</span></div>`; continue; }
+    const pastB = isToday && nm >= b.e;
+    if (b.type === 'rest'){ h += `<div class="dev rest ${now ? 'on' : ''} ${pastB ? 'past' : ''}" data-act="openblk" data-k="${k}" data-d="${date}" style="top:${s.y + 1}px;height:${s.h - 2}px"><span>${b.key === 'wash' ? '🛁' : '☕'} ${esc(b.label)} · ${durShort(b.e - b.s)}</span></div>`; continue; }
     const act = b.ev ? `data-act="openacad" data-k="${esc(b.ev.extra ? 'x:' + b.ev.id : b.ev.id)}" data-d="${date}"` : `data-act="openblk" data-k="${k}" data-d="${date}"`;
     const drop = P.cand.some(x => x.key === b.key) ? `data-drop="${k}"` : '';
     let chips = '', ovMin = 0;
@@ -3560,14 +3668,14 @@ function dayCalHTML(R, date, isToday){
         if (p.free){ chips += `<div class="dfree" style="top:${top}px;height:${p.h}px"><span>${fmt(p.s)} · 빈 시간 ${durShort(p.e - p.s)}</span></div>`; continue; }
         const it = p.it, x = it.t, cur = isToday && nm >= it.s && nm < it.e;
         if (it.over) ovMin = Math.max(ovMin, it.e - b.e);
-        chips += `<button class="tk slot ${x.done ? 'on' : ''} ${cur ? 'cur' : ''} ${it.over ? 'ov' : ''} ${it.cont ? 'cont' : ''}" data-act="opentask" data-tk="${esc(x.tk)}" data-from="${k}" data-d="${date}" style="top:${top}px;height:${p.h - 1}px"><span class="st0">${fmt(it.s)}</span><span class="o" data-act="${x.act}" ${x.attrs} data-d="${date}">${IC.check}</span><span class="tx2">${esc(x.text)}${it.cont ? ' <small>이어서</small>' : it.cut ? ' <small>→ 뒤에 이어서</small>' : ''}</span><span class="tmin">${it.out ? '칸 넘침' : durShort(it.cont || it.cut ? it.e - it.s : x.min)}</span></button>`;
+        chips += `<button class="tk slot ${x.done ? 'on' : ''} ${cur ? 'cur' : ''} ${isToday && !cur && nm >= it.e ? 'past' : ''} ${it.over ? 'ov' : ''} ${it.cont ? 'cont' : ''}" data-act="opentask" data-tk="${esc(x.tk)}" data-from="${k}" data-d="${date}" style="top:${top}px;height:${p.h - 1}px"><span class="st0">${fmt(it.s)}</span><span class="o" data-act="${x.act}" ${x.attrs} data-d="${date}">${IC.check}</span><span class="tx2">${esc(x.text)}${it.cont ? ' <small>이어서</small>' : it.cut ? ' <small>→ 뒤에 이어서</small>' : ''}</span><span class="tmin">${it.out ? '칸 넘침' : durShort(it.cont || it.cut ? it.e - it.s : x.min)}</span></button>`;
       }
       chips = `<div class="tks slots">${chips}</div>`;
     } else if (s.sch){
       chips = `<div class="tks schl">${s.sch.map(it => { const x = it.t; return `<button class="tk ${x.done ? 'on' : ''}" data-act="opentask" data-tk="${esc(x.tk)}" data-from="${k}" data-d="${date}"><span class="o" data-act="${x.act}" ${x.attrs} data-d="${date}">${IC.check}</span><span class="tx2">${esc(x.text)}</span><span class="tmin">쉬는 시간·점심</span></button>`; }).join('')}</div>`;
     }
     const muted = b.type === 'school' || b.type === 'wake' || b.type === 'travel';
-    h += `<div class="dev ${now ? 'on' : ''} ${muted ? 'mu' : ''}" ${act} ${drop} style="--c:${c};top:${s.y + 1}px;height:${s.h - 2}px">
+    h += `<div class="dev ${now ? 'on' : ''} ${muted ? 'mu' : ''} ${pastB ? 'past' : ''}" ${act} ${drop} style="--c:${c};top:${s.y + 1}px;height:${s.h - 2}px">
       <div class="dtop"><b>${esc(b.label)}</b><span class="dmeta">${fmt(b.s)}–${fmt(b.e)} · ${durShort(b.e - b.s)}${ovMin ? ` · <em class="ovm">${durShort(ovMin)} 넘침</em>` : ''}</span>${blkCheck(date, b)}</div>
       <div class="dtime">${fmt(b.s)} – ${fmt(b.e)}${now ? ' · 지금' : ''}</div>${chips}</div>`;
   }
@@ -4023,11 +4131,18 @@ async function doPrint(size, orient){
     const { jsPDF } = window.jspdf;
     let dim = size === 'A5' ? [148, 210] : [210, 297]; if (orient === 'landscape') dim = [dim[1], dim[0]];
     const pdf = new jsPDF({ unit:'mm', format:size.toLowerCase(), orientation:orient, compress:true });
-    const pages = root.querySelectorAll('.pq-page');
+    const pages = root.querySelectorAll('.pq-page'), mac = macWebApp(), imgs = [];
     for (let i = 0; i < pages.length; i++){
       const canvas = await window.html2canvas(pages[i], { scale: size === 'A5' ? 5.4 : 4, backgroundColor:'#ffffff', logging:false, useCORS:true });
+      const url = canvas.toDataURL('image/png');
+      if (mac){ imgs.push(url); continue; }
       if (i) pdf.addPage(size.toLowerCase(), orient);
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, dim[0], dim[1], undefined, 'FAST');
+      pdf.addImage(url, 'PNG', 0, 0, dim[0], dim[1], undefined, 'FAST');
+    }
+    if (mac){
+      root.remove(); sheet = null; render();
+      toast('인쇄 창 왼쪽 아래 PDF ▾ → PDF로 저장');
+      await printImages(imgs, size, orient); return;
     }
     const blob = pdf.output('blob');
     await saveFile('주간일정표_' + weekStart + '_' + size + (orient === 'landscape' ? '_가로' : '') + '.pdf', blob);
