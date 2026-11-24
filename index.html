@@ -1202,7 +1202,7 @@ function weekStartOf(date){ const dow = dowOf(date); return addDays(date, -((dow
 if (typeof module !== 'undefined') module.exports = { toMin, fmt, ymd, addDays, dowOf, buildDay, defaultSettings, splitDates, nextClassDate, weekStartOf, dayEvents };
 </script>
 <script>
-const BUILD = "12d52faeb5fd";
+const BUILD = "5cfde5663bf4";
 /* Firebase 웹 앱 설정. 콘솔의 '프로젝트 설정 → 내 앱 → SDK 설정 및 구성'에서 그대로 붙여 넣는다.
    null이면 Firebase를 안 쓰고 이 기기에만 저장한다. 이 값은 공개돼도 괜찮다(보안은 Firestore 규칙이 맡는다). */
 const FIREBASE_CONFIG = {
@@ -1770,6 +1770,13 @@ function blkKeysOf(date, key){
   if (!/:\d+\+?$/.test(key) || !b.members) return [key];
   const pre = key.replace(/:\d+\+?$/, ':'), ks = R.blocks.filter(x => x.key && x.key.startsWith(pre) && b.members.includes(x.s)).map(x => x.key);
   return ks.length ? ks : [key];
+}
+/* 지운 칸 자리에 남는 '쉬는 시간'은 공부 시간으로 바꾼다(지웠는데 쉬는 시간이 그대로 보이지 않게) */
+function gapToStudy(date, D, s, e){
+  if (s == null || e == null) return;
+  for (const g of buildDay(S, date, D).blocks.filter(b => b.type === 'rest' && /^gap:/.test(b.key || '') && b.s < e && b.e > s)){
+    D.extra = D.extra || []; D.extra.push({ id:uid(), name:'공부', start:fmt(g.s), end:fmt(g.e), kind:'study', tag:'hw', place:'here' });
+  }
 }
 function findBlock(date, key){
   const R = buildDay(S, date, getDay(date));
@@ -2795,7 +2802,7 @@ document.addEventListener('click', e => {
       toast(fmt(a) + ' ' + nm2 + ' ' + durShort(+n) + ' 넣었습니다'); return; }
     case 'gapstudy': { const a = +t.dataset.s, z = +t.dataset.e; setDay(d, D => { D.extra = D.extra || []; D.extra.push({ id:uid(), name:'공부', start:fmt(a), end:fmt(z), kind:'study', tag:'hw', place:'here' }); }); sheet = null; render(); toast('공부 시간으로 바꿨습니다'); return; }
     case 'blkstudy': { const k = t.dataset.k, { b } = findBlock(d, k); if (!b) return; const keys = blkKeysOf(d, k); setDay(d, D => { D.blk = D.blk || {}; for (const kk of keys) D.blk[kk] = { toStudy:true }; }); sheet = null; render(); toast(b.label + ' 지웠습니다'); return; }
-    case 'blkhide': { const k = t.dataset.k, keys = blkKeysOf(d, k); setDay(d, D => { D.blk = D.blk || {}; for (const kk of keys) D.blk[kk] = { hide:true }; }); sheet = null; render(); toast(t.dataset.msg || '칸을 비웠습니다'); return; }
+    case 'blkhide': { const k = t.dataset.k, keys = blkKeysOf(d, k), { b } = findBlock(d, k); setDay(d, D => { D.blk = D.blk || {}; for (const kk of keys) D.blk[kk] = { hide:true }; if (b && b.type === 'travel') gapToStudy(d, D, b.s, b.e); }); sheet = null; render(); toast(t.dataset.msg || '칸을 비웠습니다'); return; }
     case 'bsegdel': { const lb = segLabel(t.dataset.k); setDay(d, D => { D.seg = D.seg || {}; D.seg[lb] = { ...(D.seg[lb] || {}), study:true }; }); sheet = null; render(); toast(lb + ' 지웠습니다'); return; }
     case 'tdel': { const tk = t.dataset.tk, dd = d;
       if (tk.startsWith('t:')){ const id = tk.slice(2); setDay(dd, D => { D.todos = (D.todos || []).filter(x => x.id !== id); }); }
@@ -2913,7 +2920,8 @@ document.addEventListener('click', e => {
     case 'bnoschool': setDay(d, D => { if (D.noSchool) delete D.noSchool; else D.noSchool = true; }); return;
     case 'bnolunch': setDay(d, D => { D.noLunch = true; }); sheet = null; render(); toast('점심 칸을 뺐습니다'); return;
     case 'bcxkind': setDay(d, D => { const x = (D.extra||[]).find(y => 'cx:' + y.id === t.dataset.k); if (x){ x.kind = v; if (v === 'study' && !x.tag) x.tag = 'hw'; } }); return;
-    case 'bcxdel': setDay(d, D => { D.extra = (D.extra||[]).filter(y => 'cx:' + y.id !== t.dataset.k); }); sheet = sheet.prev || null; render(); toast('지웠습니다'); return;
+    case 'bcxdel': setDay(d, D => { const x = (D.extra||[]).find(y => 'cx:' + y.id === t.dataset.k); D.extra = (D.extra||[]).filter(y => 'cx:' + y.id !== t.dataset.k);
+      if (x && /^(rest|meal|travel)$/.test(x.kind)) gapToStudy(d, D, clockMin(x.start), clockMin(x.end)); }); sheet = sheet.prev || null; render(); toast('지웠습니다'); return;
     case 'print': doPrint(v || 'A4', (sheet && sheet.orient) || 'portrait'); return;
     case 'porient': sheet.orient = v; render(); return;
     case 'flexadd': { const ws = t.dataset.ws || weekStartOf(cur); ensureWeek(ws); openSheet({ type:'flex', fid:t.dataset.f, ws }); return; }
